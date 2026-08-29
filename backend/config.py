@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
+        extra="ignore"
     )
     database_url:str
     secret_key: SecretStr
@@ -47,8 +48,11 @@ class Settings(BaseSettings):
     s3_secret_access_key: SecretStr | None = None
     s3_endpoint_url: str | None = None
 
-
-
+    # AI & Knowledge Graph Configuration
+    hf_token: SecretStr | None = None
+    kaggle_api_token: SecretStr | None = None
+    memgraph_host: str = "localhost"
+    memgraph_port: int = 7687
 
 
 settings = Settings()  # type: ignore[call-arg] # Loaded from .env file``

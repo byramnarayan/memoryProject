@@ -27,19 +27,16 @@ export default function RootLayout({
     <html lang="en" className={inter.variable} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen bg-white text-ink font-sans antialiased tracking-normal" suppressHydrationWarning>
         <Providers>
+          {/* Centralized Single Site Header */}
           <Header />
           
-        {/* Main Content Area */}
-        <main role="main" className="max-w-[1200px] mx-auto w-full px-4 md:px-8 pt-32 pb-16 flex-grow">
-          
-
-
-          <div className="w-full">
+          {/* Main Full-Width Page Body Container */}
+          <div className="flex-grow w-full pt-16">
             {children}
           </div>
-        </main>
-        
-        <Footer />
+          
+          {/* Centralized Single Site Footer */}
+          <Footer />
         </Providers>
       </body>
     </html>

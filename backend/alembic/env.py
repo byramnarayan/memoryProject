@@ -1,4 +1,3 @@
-import models
 #  ensure all of model class get registerd with alembic metadata 
 #  if not did alembic will not able to see table at time of migration
 from config import settings

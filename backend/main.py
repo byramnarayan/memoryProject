@@ -1,7 +1,6 @@
 from contextlib import asynccontextmanager
 # asynccontextmanager: for life span function
-from typing import Annotated
-from fastapi import FastAPI,Request,HTTPException,Depends,status
+from fastapi import FastAPI,Request,status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exception_handlers import (
     http_exception_handler,
@@ -9,14 +8,10 @@ from fastapi.exception_handlers import (
 )
 from fastapi.exceptions import RequestValidationError
 # RequestValidationError: validation error from exception handler like /hello in place of /34
-from fastapi.responses import JSONResponse
 # JSONResponse: mainly return JSON Resposes
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select,func
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 # selectinload: eager loading relationship which is super imporant 
 # inso the solution is eager
 
@@ -29,32 +24,19 @@ from sqlalchemy.orm import selectinload
 # that in just a second.
 # query wehere need realtionshio used eager loading 
 
-from config import settings
 
 
-import models
-from database import engine, get_db
-from routers import posts,users
-
-
+from database import engine
+from routers import users, gacm
 
 
 # Base.metadata.create_all(bind=engine)
 # lifespan: morden FastAPi way t handle startup and shutdown event 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Startup
-    # async with engine.begin() as conn: # removed for postgress
-        # engine.begin: get async connection
-        # await conn.run_sync(Base.metadata.create_all) # removed for postgress
-        # create_all : is problem when add the new database table to update the change need to delete the entire table 
-        # solution: apply the migrations 
-        # migrations: tink like git move forward and backwrod thrugh out history 
-        # run_sync: let us run sync create call method inside async context
-    yield # there application acutally runs 
-    # Shutdown
+    yield
     await engine.dispose()
-#  in end it do async way to to creating database if it do not exit 
+
 app = FastAPI(lifespan=lifespan)
 
 # Enable CORS so Next.js frontend (port 3000) can communicate with FastAPI backend (port 8000)
@@ -66,178 +48,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ==============================================================================
-# 🚨 CRITICAL STUDY NOTE: SYNC VS. ASYNC RELATIONSHIP LOADING (THE #1 ASYNC PITFALL)
-# ==============================================================================
-#
-# 1. THE SYNCHRONOUS WAY: "LAZY LOADING"
-#    In Sync SQLAlchemy, when you fetch a Post, its related Author isn't fetched yet.
-#    The moment your code (or HTML template) accesses `post.author.username`, SQLAlchemy
-#    silently triggers a hidden, synchronous database query in the background to grab 
-#    the user information. It "just works" because blocking the thread is allowed.
-#
-# 2. THE ASYNC CRISIS: "MISSING GREENLET ERROR"
-#    In Async SQLAlchemy, implicit lazy loading is strictly banned. 
-#    If you try to run `post.author.username` without preparing it beforehand, your app
-#    will crash instantly with:
-#    ❌ `sqlalchemy.exc.MissingGreenlet: Field 'author' is not loaded...`
-#
-#    WHY? Because accessing a Python property (`post.author`) cannot be prefixed with
-#    the `await` keyword. SQLAlchemy cannot pause the entire global async event loop 
-#    to make a hidden, blocking network call, so it throws a safety error instead.
-#
-# 3. THE PRODUCTION FIX: "EAGER LOADING" WITH `selectinload`
-#    To prevent this, you must explicitly tell SQLAlchemy to fetch the related data 
-#    IMMEDIATELY during the main, awaited query. This is called Eager Loading.
-# 
-# 
-# 
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
-# app.mount("/media", StaticFiles(directory="media"), name="media") # removed after aws 
 
 templates = Jinja2Templates(directory="templates")
 
 app.include_router(users.router, prefix="/api/users", tags=["users"])
+app.include_router(gacm.router, prefix="/api/gacm", tags=["gacm"])
+
 # tags: create collapsable sections
 # Prefix add that traling slash
 #
-app.include_router(posts.router, prefix="/api/posts", tags=["posts"])
 
 
-## home route - paginated
+
 @app.get("/", include_in_schema=False, name="home")
-async def home(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):
-    count_result = await db.execute(select(func.count()).select_from(models.Post))
-    total = count_result.scalar() or 0
-
-    result = await db.execute(
-        select(models.Post)
-        .options(selectinload(models.Post.author))
-        .order_by(models.Post.date_posted.desc())
-        .limit(settings.posts_per_page),
-    )
-    posts = result.scalars().all()
-
-    has_more = len(posts) < total
-
+async def home(request: Request):
     return templates.TemplateResponse(
         request,
         "home.html",
         {
-            "posts": posts,
             "title": "Home",
-            "limit": settings.posts_per_page,
-            "has_more": has_more,
-        },
-    )
-
-# @app.get("/", include_in_schema=False, name="home")
-# # given name="home" so {{ url_for('home') }} use explict name when apply two const.
-# async def home(request: Request, db: Annotated[AsyncSession, Depends(get_db)]):# request parameter as argument because Jinja2 required that
-#     result = await db.execute(select(models.Post)
-#     .options(selectinload(models.Post.author))
-#     .order_by(models.Post.date_posted.desc())
-#     )
-#     # options: this is eager loading
-#     posts = result.scalars().all()
-
-#     # by doing this we get our post from database
-#     return templates.TemplateResponse(
-#         request, # need jinja2 to work
-#         "home.html",#name of template file
-#         {"posts": posts, "title": "Home"},
-#         # context dict: contain all of variable that will be use in frontend
-#         # template can acess anything that is in that context
-#         # jinja3 let us acess dict key as dot notation, which is clean way to do in our template
-#         # IF STATEMENT{% for post in posts%}
-#         #             {% endfor %}
-#         # CONDITION STATMENT {% if title%}
-#         #                    {% else %}
-#         #                    {% endif %}
-#         # BLOCK CONTENT ->layout.html
-#         #{% block content %}
-#         #{% endblock content %}
-#         # home.html
-#         # {% extends layout.html%}
-#         # {% block content %}
-#         # code
-#         # {% endblock content%}
-#         # ********
-#         # Route Links:
-#             # passing **** def home(): function name
-#             # To generate links to specific pages in your navigation (e.g., {{ url_for('home') }})
-#         # Static Files:
-#             # To link to CSS, JavaScript, or images.
-#             # You reference the name you gave your static directory during mounting
-#             # (e.g., {{ url_for('static', path='css/main.css') }})
-#             # 
-#             # 
-#             # 
-#         #  need to change the template after adding the database for new relationship data 
-#         # home.html, post.html need to chnage how we display date and author
-#         # becaus author is now object
-#         # so  post.author  become  post.author.username 
-#         # date is datetime object 
-#     )
-
-@app.get("/posts/{post_id}", include_in_schema=False)
-async def post_page(request: Request, post_id: int, db: Annotated[AsyncSession, Depends(get_db)]):
-    result =await db.execute(select(models.Post).options(selectinload(models.Post.author)).where(models.Post.id == post_id))
-    post = result.scalars().first()
-    if post:
-        title = post.title[:50]
-        return templates.TemplateResponse(
-            request,
-            "post.html",
-            {"post": post, "title": title},
-        )
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-        #  ALLWAYS USE THIS in  html respone this is raise error to RestAPI
-#  href="{{ url_for("post_page", post_id=post.id)}}: pass path parameter as keyword argument post_id=post.id
-
-
-# template version to see specific user all post 
-@app.get("/users/{user_id}/posts", include_in_schema=False, name="user_posts")
-async def user_posts_page(
-    request: Request,
-    user_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
-):
-    result = await db.execute(select(models.User).where(models.User.id == user_id))
-    user = result.scalars().first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
-        )
-
-    count_result = await db.execute(
-        select(func.count())
-        .select_from(models.Post)
-        .where(models.Post.user_id == user_id),
-    )
-    total = count_result.scalar() or 0
-
-    result = await db.execute(
-        select(models.Post)
-        .options(selectinload(models.Post.author))
-        .where(models.Post.user_id == user_id)
-        .order_by(models.Post.date_posted.desc())
-        .limit(settings.posts_per_page),
-    )
-    posts = result.scalars().all()
-
-    has_more = len(posts) < total
-
-    return templates.TemplateResponse(
-        request,
-        "user_posts.html",
-        {
-            "posts": posts,
-            "user": user,
-            "title": f"{user.username}'s Posts",
-            "limit": settings.posts_per_page,
-            "has_more": has_more,
         },
     )
 ## login and register template_routes

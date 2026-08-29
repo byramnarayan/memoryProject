@@ -1,0 +1,344 @@
+<!DOCTYPE html><html lang="en" style="width: 1280px; height: 1024px; overflow: hidden; position: relative;"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Knowledge Graph Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700;800&amp;family=JetBrains+Mono:wght@500&amp;family=Work+Sans:wght@400&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed-variant": "#2f486a",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f5f3ee",
+                        "surface-container": "#f0eee9",
+                        "background": "#fbf9f4",
+                        "on-error-container": "#93000a",
+                        "secondary-container": "#fdc003",
+                        "secondary": "#785900",
+                        "primary-fixed": "#d4e3ff",
+                        "on-surface-variant": "#43474e",
+                        "error": "#ba1a1a",
+                        "surface-variant": "#e4e2dd",
+                        "on-background": "#1b1c19",
+                        "on-secondary": "#ffffff",
+                        "outline-variant": "#c4c6cf",
+                        "on-secondary-container": "#6c5000",
+                        "tertiary-container": "#002417",
+                        "on-surface": "#1b1c19",
+                        "primary-container": "#001f3f",
+                        "primary-fixed-dim": "#afc8f0",
+                        "tertiary": "#000703",
+                        "surface-bright": "#fbf9f4",
+                        "error-container": "#ffdad6",
+                        "on-secondary-fixed": "#261a00",
+                        "on-tertiary": "#ffffff",
+                        "inverse-on-surface": "#f2f1ec",
+                        "surface": "#fbf9f4",
+                        "on-error": "#ffffff",
+                        "on-primary-container": "#6f88ad",
+                        "tertiary-fixed": "#70fbc4",
+                        "surface-tint": "#476083",
+                        "secondary-fixed": "#ffdf9e",
+                        "on-tertiary-fixed-variant": "#005139",
+                        "surface-container-high": "#eae8e3",
+                        "surface-container-highest": "#e4e2dd",
+                        "on-secondary-fixed-variant": "#5b4300",
+                        "on-tertiary-fixed": "#002115",
+                        "secondary-fixed-dim": "#fabd00",
+                        "on-tertiary-container": "#00996e",
+                        "primary": "#000613",
+                        "on-primary-fixed": "#001c3a",
+                        "on-primary": "#ffffff",
+                        "inverse-primary": "#afc8f0",
+                        "outline": "#74777f",
+                        "tertiary-fixed-dim": "#50dea9",
+                        "inverse-surface": "#30312e",
+                        "surface-dim": "#dbdad5"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "gutter": "24px",
+                        "container-max": "1440px",
+                        "margin-page": "40px",
+                        "node-gap": "12px",
+                        "unit": "4px"
+                    },
+                    "fontFamily": {
+                        "body-lg": ["Work Sans"],
+                        "body-md": ["Work Sans"],
+                        "headline-lg": ["Hanken Grotesk"],
+                        "headline-lg-mobile": ["Hanken Grotesk"],
+                        "headline-xl": ["Hanken Grotesk"],
+                        "label-technical": ["JetBrains Mono"],
+                        "headline-md": ["Hanken Grotesk"]
+                    },
+                    "fontSize": {
+                        "body-lg": ["18px", { "lineHeight": "1.6", "fontWeight": "400" }],
+                        "body-md": ["16px", { "lineHeight": "1.5", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["26px", { "lineHeight": "1.2", "fontWeight": "700" }],
+                        "headline-xl": ["40px", { "lineHeight": "1.1", "letterSpacing": "-0.02em", "fontWeight": "800" }],
+                        "label-technical": ["13px", { "lineHeight": "1.0", "letterSpacing": "0.05em", "fontWeight": "500" }],
+                        "headline-md": ["24px", { "lineHeight": "1.3", "fontWeight": "600" }]
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        body { background-color: theme('colors.background'); }
+        .node { border: 1px solid theme('colors.primary-container'); background-color: theme('colors.surface-container-lowest'); border-radius: theme('borderRadius.DEFAULT'); padding: 8px 12px; display: inline-flex; align-items: center; justify-content: center; position: absolute; }
+        .node.active { border: 2px solid theme('colors.secondary-container'); box-shadow: 0 4px 6px -1px rgba(0, 31, 63, 0.1), 0 2px 4px -1px rgba(0, 31, 63, 0.06); }
+        .node-primary { background-color: theme('colors.primary-container'); color: theme('colors.on-primary'); border: none; }
+        .node-gold { border-color: theme('colors.secondary-container'); }
+        
+        .link { position: absolute; border-top: 1px dashed theme('colors.primary-container'); transform-origin: 0 0; z-index: 0; }
+        .link-solid { border-top-style: solid; }
+        .link-gold { border-top-color: theme('colors.secondary-container'); }
+        
+        /* Floating Panel Glassmorphism */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid theme('colors.outline-variant');
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+        }
+    </style>
+</head>
+<body class="text-on-background font-body-md h-screen overflow-hidden flex flex-col">
+<!-- TopAppBar -->
+<header class="bg-background dark:bg-background border-b border-outline-variant docked full-width top-0 z-50">
+<div class="flex justify-between items-center px-gutter w-full h-16 max-w-container-max mx-auto">
+<!-- Brand -->
+<div class="flex items-center gap-4">
+
+
+</div>
+<!-- Search (on left as requested, but shifted slightly right from brand) -->
+<div class="flex-1 max-w-md mx-8 hidden md:block">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-surface-container-low border-b-2 border-transparent focus:border-primary-container rounded-t-DEFAULT focus:outline-none text-label-technical font-label-technical transition-colors" placeholder="Search videos or concepts..." type="text">
+</div>
+</div>
+<!-- Navigation Links (Web) -->
+<nav class="hidden md:flex gap-6 mr-8">
+<a class="text-on-surface-variant font-medium text-label-technical font-label-technical hover:bg-surface-container-low transition-colors duration-200 py-4 flex flex-col justify-center" href="#">Channel Performance</a>
+<a class="text-primary font-bold border-b-2 border-secondary text-label-technical font-label-technical hover:bg-surface-container-low transition-colors duration-200 py-4 flex flex-col justify-center" href="#">Transcript Semantics</a>
+</nav>
+<!-- Actions -->
+<div class="flex items-center gap-4">
+<button class="bg-secondary-container text-on-secondary-container text-label-technical font-label-technical px-6 py-2 rounded-DEFAULT font-bold hover:bg-secondary-fixed-dim transition-colors active:scale-95 duration-100">
+                    Synthesize
+                </button>
+<div class="flex gap-2 text-primary dark:text-primary-fixed-dim">
+<button class="p-2 hover:bg-surface-container-low rounded-full transition-colors"><span class="material-symbols-outlined">settings</span></button>
+<button class="p-2 hover:bg-surface-container-low rounded-full transition-colors"><span class="material-symbols-outlined">help</span></button>
+</div>
+<img alt="User Analyst Profile" class="w-8 h-8 rounded-full border border-outline-variant object-cover" data-alt="User Analyst Profile avatar, navy blue background with white initials" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB9SrSX9Qm1sSaoyTaPslngYoM8kN80UyjfP6E0c7alRe616t11eV2QjPS0wMF757MLQKkMXuznKe19UOopXxS9LjIdWL7SHHqJAjNswh9CKErS0Y6NJkpRbPxsz8hnfzLirxhqC1y-b32I1NUEAEayqojF_1pO-trqUGpG3c3HR6twHSMWIn0Zntuqc0EJaBC3737WMigKd7lpTKELfAGMrp3ctsmsjocRy3pXUJr4-r2JBs6rEmzW">
+</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- SideNavBar -->
+<aside class="bg-surface-container-lowest dark:bg-surface-container-lowest border-r border-outline-variant shadow-sm w-64 h-full flex flex-col z-40 flex-shrink-0">
+<div class="p-6 border-b border-outline-variant">
+<div class="flex items-center gap-3 mb-6">
+<img alt="System Intelligence" class="w-10 h-10 rounded-full border border-outline-variant" data-alt="System Intelligence avatar, light background with navy initials" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDRdQcQOxgSf43tvWnMwik0ihzl40SjW_PgqxLkA7vpeVXXE1dO8EjTW1tcfO5C7ZR3LT7G9rPF_0ypWjhdBPT1T5Ize6EsJOn_YmQ5NvokgBuAlrJJzdDr4hKOkmv0JhbXvRbWqRHgjXSAexIdDY5dZLLTkP7348QuAzp5wW0xcoeDbj-Jrsw484o3JcefJt4i6PN-zynhKD_5wCIN40VeJZM4LzroIWWgDMhi9RMKqB8ksgJ3tUvo">
+<div>
+<h2 class="text-headline-sm font-headline-xl text-primary leading-tight text-sm">Gemini Analyst</h2>
+<p class="text-label-technical font-label-technical text-on-surface-variant text-xs">Institutional Knowledge</p>
+</div>
+</div>
+<button class="w-full bg-primary-container text-on-primary text-label-technical font-label-technical py-2 rounded-DEFAULT font-bold hover:opacity-90 transition-opacity active:opacity-80">
+                    New Analysis
+                </button>
+</div>
+<nav class="flex-1 py-4 px-3 flex flex-col gap-1">
+<a class="bg-secondary-container text-on-secondary-container rounded-lg font-bold flex items-center gap-3 px-3 py-2 text-label-technical font-label-technical hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined">hub</span> Graph Explorer
+                </a>
+<a class="text-on-surface-variant hover:text-primary flex items-center gap-3 px-3 py-2 text-label-technical font-label-technical hover:bg-surface-container transition-all" href="#"><span class="material-symbols-outlined">account_balance</span> Experts</a>
+<a class="text-on-surface-variant hover:text-primary flex items-center gap-3 px-3 py-2 text-label-technical font-label-technical hover:bg-surface-container transition-all" href="#"><span class="material-symbols-outlined">group</span> SPOF Risk</a>
+<a class="text-on-surface-variant hover:text-primary flex items-center gap-3 px-3 py-2 text-label-technical font-label-technical hover:bg-surface-container transition-all" href="#"><span class="material-symbols-outlined">forum</span> Clusters</a>
+</nav>
+<div class="p-3 border-t border-outline-variant flex flex-col gap-1 mt-auto">
+<a class="text-on-surface-variant hover:text-primary flex items-center gap-3 px-3 py-2 text-label-technical font-label-technical hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined">settings</span> Settings
+                </a>
+<a class="text-on-surface-variant hover:text-primary flex items-center gap-3 px-3 py-2 text-label-technical font-label-technical hover:bg-surface-container transition-all" href="#">
+<span class="material-symbols-outlined">logout</span> Logout
+                </a>
+</div>
+</aside>
+<!-- Main Content Canvas (Graph Area) -->
+<main class="flex-1 relative overflow-hidden bg-background">
+<!-- Graph Visualization Layer -->
+<div class="absolute inset-0 w-full h-full" id="graph-container">
+<!-- Links (Rendered behind nodes) -->
+<!-- Central to Primary Nodes -->
+<div class="link link-solid" style="width: 150px; transform: translate(600px, 400px) rotate(-45deg);"></div>
+<div class="link link-solid" style="width: 120px; transform: translate(600px, 400px) rotate(-15deg);"></div>
+<div class="link link-solid" style="width: 180px; transform: translate(600px, 400px) rotate(20deg);"></div>
+<div class="link link-solid" style="width: 160px; transform: translate(600px, 400px) rotate(60deg);"></div>
+<div class="link link-solid" style="width: 140px; transform: translate(600px, 400px) rotate(110deg);"></div>
+<div class="link link-solid" style="width: 170px; transform: translate(600px, 400px) rotate(160deg);"></div>
+<div class="link link-solid" style="width: 130px; transform: translate(600px, 400px) rotate(210deg);"></div>
+<!-- Secondary Branches (Dashed) -->
+<div class="link" style="width: 100px; transform: translate(500px, 300px) rotate(-80deg);"></div>
+<div class="link" style="width: 80px; transform: translate(500px, 300px) rotate(-30deg);"></div>
+<div class="link" style="width: 110px; transform: translate(750px, 250px) rotate(-10deg);"></div>
+<div class="link" style="width: 90px; transform: translate(750px, 250px) rotate(45deg);"></div>
+<div class="link link-gold" style="width: 120px; transform: translate(650px, 550px) rotate(80deg);"></div>
+<div class="link link-gold" style="width: 100px; transform: translate(650px, 550px) rotate(135deg);"></div>
+<!-- Nodes -->
+<!-- Center Node -->
+<div class="node node-primary active z-10" style="left: 560px; top: 380px;">
+<span class="text-label-technical font-label-technical">ADK 2.0</span>
+</div>
+<!-- Primary Connections -->
+<div class="node z-10" style="left: 480px; top: 280px;">
+<span class="text-label-technical font-label-technical">Google</span>
+</div>
+<div class="node node-gold z-10" style="left: 720px; top: 230px;">
+<span class="text-label-technical font-label-technical text-secondary">AI Agents</span>
+</div>
+<div class="node z-10" style="left: 760px; top: 350px;">
+<span class="text-label-technical font-label-technical">Developers</span>
+</div>
+<div class="node z-10" style="left: 720px; top: 480px;">
+<span class="text-label-technical font-label-technical">Vertex AI</span>
+</div>
+<div class="node z-10" style="left: 630px; top: 540px;">
+<span class="text-label-technical font-label-technical">Gemini</span>
+</div>
+<div class="node z-10" style="left: 420px; top: 480px;">
+<span class="text-label-technical font-label-technical">Enterprise Teams</span>
+</div>
+<div class="node z-10" style="left: 400px; top: 360px;">
+<span class="text-label-technical font-label-technical">Support Router Agent</span>
+</div>
+<!-- Secondary Connections -->
+<div class="node z-10" style="left: 490px; top: 180px;">
+<span class="text-label-technical font-label-technical text-xs">Travel Planner Agent</span>
+</div>
+<div class="node z-10" style="left: 560px; top: 220px;">
+<span class="text-label-technical font-label-technical text-xs">Dynamic Workflows</span>
+</div>
+<div class="node z-10" style="left: 850px; top: 210px;">
+<span class="text-label-technical font-label-technical text-xs">ADK 1.0</span>
+</div>
+<div class="node z-10" style="left: 830px; top: 280px;">
+<span class="text-label-technical font-label-technical text-xs">LangChain</span>
+</div>
+<div class="node z-10" style="left: 600px; top: 650px;">
+<span class="text-label-technical font-label-technical text-xs">Refund Approval Agent</span>
+</div>
+<div class="node z-10" style="left: 720px; top: 620px;">
+<span class="text-label-technical font-label-technical text-xs">Multi-Agent System</span>
+</div>
+<div class="node z-10" style="left: 500px; top: 600px;">
+<span class="text-label-technical font-label-technical text-xs">Agentic AI</span>
+</div>
+</div>
+<!-- Floating Panels -->
+<div class="absolute right-6 top-6 bottom-6 w-96 flex flex-col gap-6 z-20 pointer-events-none">
+<!-- Definition & Context Panel -->
+<div class="glass-panel rounded-xl p-5 flex-shrink-0 pointer-events-auto">
+<div class="flex justify-between items-center mb-3">
+<h3 class="text-label-technical font-label-technical text-on-surface-variant uppercase tracking-wider text-xs">Definition &amp; Context</h3>
+<button class="text-outline hover:text-primary"><span class="material-symbols-outlined text-sm">close</span></button>
+</div>
+<p class="text-body-md font-body-md text-on-surface text-sm">
+                        Google's Agent Development Kit version 2.0, a framework designed for building sophisticated AI agents with collaborative modes, dynamic workflows, and deep integration with Vertex AI and Gemini models.
+                    </p>
+</div>
+<!-- Gemini Analyst Chat Panel -->
+<div class="glass-panel rounded-xl flex flex-col flex-1 pointer-events-auto border-t-4 border-t-primary-container overflow-hidden">
+<div class="bg-primary-container text-on-primary p-3 flex justify-between items-center">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">forum</span>
+<h3 class="text-label-technical font-label-technical font-bold text-xs uppercase tracking-widest">Gemini Analyst Chat</h3>
+</div>
+<div class="flex gap-2">
+<button class="hover:text-secondary-fixed transition-colors"><span class="material-symbols-outlined text-sm">cleaning_services</span></button>
+<button class="hover:text-secondary-fixed transition-colors"><span class="material-symbols-outlined text-sm">settings</span></button>
+</div>
+</div>
+<div class="flex-1 p-4 overflow-y-auto bg-surface-container-lowest text-sm">
+<ul class="space-y-4">
+<li class="flex gap-2">
+<span class="material-symbols-outlined text-primary-container text-base mt-0.5">smart_toy</span>
+<div>
+<p class="text-body-md font-body-md text-on-surface leading-tight mb-1">
+<a class="text-primary-container font-medium hover:underline" href="#">AI Agents Dropped Directly Into Workspace and It's Insane ð</a>
+</p>
+<p class="text-xs text-on-surface-variant">Mentions <span class="bg-surface-container px-1 py-0.5 rounded text-primary-container font-label-technical text-[10px]">ADK (Agent Development Kit)</span>, <span class="bg-surface-container px-1 py-0.5 rounded text-primary-container font-label-technical text-[10px]">ADK</span></p>
+</div>
+</li>
+<li class="flex gap-2">
+<span class="material-symbols-outlined text-primary-container text-base mt-0.5">smart_toy</span>
+<div>
+<p class="text-body-md font-body-md text-on-surface leading-tight mb-1">
+<a class="text-primary-container font-medium hover:underline" href="#">A2UI: The Protocol That Makes AI Design Functional UIs ð</a>
+</p>
+<p class="text-xs text-on-surface-variant">Mentions <span class="bg-surface-container px-1 py-0.5 rounded text-primary-container font-label-technical text-[10px]">ADK</span>, <span class="bg-surface-container px-1 py-0.5 rounded text-primary-container font-label-technical text-[10px]">Google ADK</span></p>
+</div>
+</li>
+<li class="flex gap-2">
+<span class="material-symbols-outlined text-primary-container text-base mt-0.5">smart_toy</span>
+<div>
+<p class="text-body-md font-body-md text-on-surface leading-tight mb-1">
+<a class="text-primary-container font-medium hover:underline" href="#">PaperBanana - Is this the BEST Agentic Framework for Generating COMPLEX Images? ð</a>
+</p>
+<p class="text-xs text-on-surface-variant">Mentions <span class="bg-surface-container px-1 py-0.5 rounded text-primary-container font-label-technical text-[10px]">ADK (Agent Development Kit)</span></p>
+</div>
+</li>
+</ul>
+</div>
+<div class="p-3 bg-surface-container-low border-t border-outline-variant flex gap-2">
+<input class="flex-1 bg-surface-container-lowest border-b-2 border-transparent focus:border-primary-container rounded-t px-3 py-2 text-sm focus:outline-none transition-colors" placeholder="Ask about this dashboard..." type="text">
+<button class="bg-secondary-container text-on-secondary-container px-4 py-2 rounded font-bold text-label-technical font-label-technical hover:bg-secondary-fixed-dim transition-colors">
+                            SEND
+                        </button>
+</div>
+</div>
+</div>
+<!-- Graph Legend (Bottom Left) -->
+<div class="absolute bottom-6 left-6 glass-panel rounded-lg p-3 z-20 flex gap-4 items-center">
+<span class="text-label-technical font-label-technical text-on-surface-variant text-xs font-bold uppercase">Legend:</span>
+<div class="flex items-center gap-1">
+<div class="w-3 h-3 rounded-full bg-primary-container"></div>
+<span class="text-label-technical font-label-technical text-xs">Primary Node</span>
+</div>
+<div class="flex items-center gap-1">
+<div class="w-3 h-3 rounded-full border border-primary-container bg-surface-container-lowest"></div>
+<span class="text-label-technical font-label-technical text-xs">Entity</span>
+</div>
+<div class="flex items-center gap-1">
+<div class="w-3 h-3 rounded-full border-2 border-secondary-container bg-surface-container-lowest"></div>
+<span class="text-label-technical font-label-technical text-xs">Agent Type</span>
+</div>
+</div>
+<!-- Zoom Controls (Bottom Right, outside panels if needed, but keeping clean) -->
+<div class="absolute bottom-6 right-[420px] glass-panel rounded-lg p-1 z-20 flex flex-col gap-1">
+<button class="p-2 hover:bg-surface-container rounded transition-colors text-on-surface"><span class="material-symbols-outlined text-sm">add</span></button>
+<button class="p-2 hover:bg-surface-container rounded transition-colors text-on-surface"><span class="material-symbols-outlined text-sm">remove</span></button>
+<button class="p-2 hover:bg-surface-container rounded transition-colors text-on-surface"><span class="material-symbols-outlined text-sm">fit_screen</span></button>
+</div>
+</main>
+</div>
+
+
+</body></html>

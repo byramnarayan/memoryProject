@@ -25,6 +25,7 @@ export default function Header() {
                   Wakamono
                 </Link>
                 <div className="hidden md:flex items-center space-x-6">
+                  <Link href="/gacm" className="text-gold font-bold text-sm tracking-wide transition-colors hover:text-yellow-400">GRAPH EXPLORER</Link>
                   <Link href="/library" className="text-white hover:text-gold font-medium text-sm tracking-wide transition-colors">LIBRARY</Link>
                   <Link href="/community" className="text-white hover:text-gold font-medium text-sm tracking-wide transition-colors">COMMUNITY</Link>
                 </div>

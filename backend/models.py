@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import UTC, datetime
-from sqlalchemy import DateTime, ForeignKey, String, Text, Integer
+from sqlalchemy import DateTime, ForeignKey, String, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 from config import settings
@@ -31,24 +31,7 @@ class User(Base):
     password_hash: Mapped[str]= mapped_column(String(200), nullable=False)
 
     
-    # One-to-Many Relationship: One user can have many posts.
-    # 'back_populates' syncs this property with the corresponding 'author' field in the Post model.
-    posts: Mapped[list[Post]]= relationship(back_populates="author", cascade="all, delete-orphan")
-   # one user have many post 
-   # back_populate: that link author field on post 
-   # cascade: if user deleted delete all of there post also 
-   # allow us to do somthing like users.posts to grab all user post
-   # refernce Post Before it is define it is callled as the forword referance and alavliabke in python 3.14
-        # ┌──────────────┐                       ┌──────────────┐
-        # │  USER MODEL  │                       │  POST MODEL  │
-        # ├──────────────┤                       ├──────────────┤
-        # │  id (1)      │                       │  id (99)     │
-        # │  username    │                       │  title       │
-        # │              │                       │  user_id (1) ┼──┐
-        # │  posts  ─────┼───( back_populates )──┼─►author      │  │ (Foreign Key Enforces
-        # └──────▲───────┘                       └──────────────┘  │  Data Integrity Match)
-        #        │                                                 │
-        #        └─────────────────────────────────────────────────┘
+
     
     ## User.reset_tokens relationship
     reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
@@ -66,42 +49,7 @@ class User(Base):
             return f"https://{settings.s3_bucket_name}.s3.{settings.s3_region}.amazonaws.com/profile_pics/{self.image_file}"
         return "/static/profile_pics/default.jpg" 
 
-class Post(Base):
-    """
-        Represents the database structure for Blog Posts.
-    """
-    __tablename__="posts"
-    id: Mapped[int]=mapped_column(Integer, primary_key=True,index=True)
-    title: Mapped[str]=mapped_column(String(50), nullable=False)
-    content: Mapped[str]=mapped_column(Text, nullable=False)
-    user_id: Mapped[int]=mapped_column(ForeignKey("users.id"), nullable=False, index=True)
-    # ForeignKey: that link post to user this must refarnace to valide user
-    # Setting an index here acts like a book index: it makes filtering queries (like tracking
-        # down posts written by user #5) significantly faster, 
-        # with a minor trade-off of slightly slower writes.
 
-    # Timezones: Using 'timezone=True' ensures that dates remain consistent if we scale
-    # our servers or move away from SQLite to PostgreSQL down the road.
-    date_posted: Mapped[datetime] = mapped_column(
-            DateTime(timezone=True), 
-            default=lambda: datetime.now(UTC)
-        )
-
-    # Many-to-One Relationship: Many posts belong to one individual user author.
-    # Allows us to run `post.author` to instantly get the 
-    # parent User object without writing complex JOIN queries. sqlalchemy handle that for us
-    author: Mapped[User] = relationship(back_populates="posts")
-
-
-    # likes models add with migration 
-            
-    ## Likes Field
-    likes: Mapped[int] = mapped_column(Integer, default=0, server_default="0") 
-    # default: python side default 
-    # server_default: server side default 
-    # always thnik when adding the new column in new table think what happen to existing table 
-
-    #  so when database try tp setup database 
 
 
 

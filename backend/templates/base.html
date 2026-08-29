@@ -101,10 +101,7 @@
             
             <!-- Shown when logged in (hidden by default, shown via JS) -->
             <div id="loggedInNav" class="hidden items-center space-x-4">
-              <button type="button" onclick="document.getElementById('createPostModal').showModal()"
-                class="px-4 py-2 border border-white/30 text-white hover:border-white hover:text-white rounded-none font-bold text-sm tracking-wide transition-colors">
-                NEW POST
-              </button>
+
               <a href="{{ url_for('account_page') }}" id="accountBtn"
                 class="bg-white text-navy hover:bg-cream px-5 py-2 rounded-none font-bold text-sm tracking-wide transition-colors">
                 Account
@@ -139,10 +136,7 @@
             <!-- Auth State Container Mobile -->
             <!-- Shown when logged in -->
             <div id="loggedInNavMobile" class="hidden flex-col space-y-4">
-              <button type="button" onclick="document.getElementById('createPostModal').showModal()"
-                class="text-left px-4 py-2 border border-white/30 text-white hover:border-white hover:text-white rounded-none font-bold text-sm tracking-wide transition-colors">
-                NEW POST
-              </button>
+
               <a href="{{ url_for('account_page') }}" id="accountBtnMobile"
                 class="text-gold font-bold text-sm tracking-wide block hover:text-yellow-400 transition-colors">
                 Account
@@ -281,37 +275,7 @@
       <p>© <span id="year"></span> Site Name. All rights reserved.</p>
     </div>
   </footer>
-  <!-- Create Post Modal (Native HTML Dialog) -->
-  <dialog id="createPostModal"
-    class="backdrop:bg-navy/80 backdrop:backdrop-blur-sm rounded-none border border-brand bg-white p-0 w-full max-w-2xl text-ink shadow-2xl">
-    <div class="flex justify-between items-center px-6 py-4 border-b border-brand bg-cream">
-      <h5 class="text-lg font-bold font-heading uppercase tracking-wide">New Post</h5>
-      <button type="button" onclick="document.getElementById('createPostModal').close()"
-        class="text-muted-grey hover:text-ink focus:outline-none text-xl font-bold transition-colors">&times;</button>
-    </div>
-    <!-- imp createPostForm: ref this in javascripts -->
-    <form id="createPostForm" class="m-0">
-      <div class="px-6 py-6 space-y-4">
-        <div>
-          <label for="title" class="block text-sm font-bold uppercase tracking-wider mb-2">Title</label>
-          <input type="text" id="title" name="title" required
-            class="w-full border border-brand px-4 py-2 focus:outline-none focus:border-ink bg-white">
-          <!-- required attrib for basic broswer validation  -->
-        </div>
-        <div>
-          <label for="content" class="block text-sm font-bold uppercase tracking-wider mb-2">Content</label>
-          <textarea id="content" name="content" rows="5" required
-            class="w-full border border-brand px-4 py-2 focus:outline-none focus:border-ink bg-white"></textarea>
-        </div>
-      </div>
-      <div class="flex justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-brand">
-        <button type="button" onclick="document.getElementById('createPostModal').close()" class="px-5 py-2 text-xs font-bold uppercase tracking-wider border
-         border-brand text-ink bg-white hover:bg-cream transition-colors">Cancel</button>
-        <button type="submit" class="px-5 py-2 text-xs font-bold uppercase tracking-wider
-         border border-navy text-white bg-navy hover:bg-ink transition-colors">Post</button>
-      </div>
-    </form>
-  </dialog>
+
 
   <!-- Success Modal -->
   <dialog id="successModal"
@@ -420,99 +384,7 @@
     updateAuthUI();
   </script>
 
-  <!-- Create Post Form Handler -->
-  <script type="module">
-    // Import utility functions for modals and error handling, plus our new auth module!
-    import { getErrorMessage, hideModal, showModal } from "/static/js/utils.js";
-    import { getCurrentUser } from "/static/js/auth.js";
-    import {getToken} from '/static/js/auth.js';
-    // Grab a reference to the form element from the DOM
-    const createForm = document.getElementById("createPostForm");
 
-    /**
-     * Form Submission Handler for Creating a Post
-     * 
-     * How it works:
-     * 1. Intercepts the default HTML form submission.
-     * 2. Extracts the title and content typed by the user.
-     * 3. Checks who is currently logged in to assign the post to them.
-     * 4. Sends a POST request to the FastAPI backend to save the post to the database.
-     * 5. Closes the creation modal and shows a success/error modal depending on the server response.
-     */
-    createForm.addEventListener("submit", async (event) => {
-      // 1. Prevent the page from refreshing when the user clicks 'Post'
-      event.preventDefault();
-      // ## token_check
-        const token = getToken();
-        if (!token) {
-            window.location.href = '/login';
-            return;
-        }
-
-      // 2. Extract the form data into a neat JavaScript object: { title: "...", content: "..." }
-      const formData = new FormData(createForm);
-      const postData = Object.fromEntries(formData.entries());
-
-      // 3. Attach the currently logged-in user's ID to the post
-      // We fetch the user from our auth cache. If they aren't logged in, we show an error.
-      // const user = await getCurrentUser();
-      // if (!user) {
-      //   document.getElementById("errorMessage").textContent = "You must be logged in to create a post.";
-      //   hideModal("createPostModal");
-      //   showModal("errorModal");
-      //   return;
-      // }
-      // postData.user_id = user.id;
-
-      try {
-        // 4. Send the data to the backend API as a JSON string
-        const response = await fetch("/api/posts", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify(postData),
-        });
-        
-        // ## if_401_check
-        if (response.status === 401) {
-            window.location.href = '/login';
-            return;
-        }
-
-        if (response.ok) {
-          // Success: The backend saved the post and returned the new post object
-          const data = await response.json();
-          document.getElementById("successMessage").textContent = `Post "${data.title}" created successfully!`;
-
-          // 5. Hide the input modal and show the success message
-          hideModal("createPostModal");
-          showModal("successModal");
-
-          // Clear out the text inputs so it's empty next time they open it
-          createForm.reset();
-
-          // Listen for the native `<dialog>` close event to refresh the page so the new post appears!
-          document.getElementById("successModal").addEventListener("close", () => {
-             window.location.reload();
-          }, { once: true });
-
-        } else {
-          // Error: The backend rejected the post (e.g. missing fields, validation failed)
-          const error = await response.json();
-          document.getElementById("errorMessage").textContent = getErrorMessage(error);
-
-          hideModal("createPostModal");
-          showModal("errorModal");
-        }
-      } catch (error) {
-        // Network Error: The server is down or unreachable
-        document.getElementById("errorMessage").textContent = "Network error. Please check your connection and try again.";
-        showModal("errorModal");
-      }
-    });
-  </script>
   {% block scripts %}
   {% endblock scripts %}
 </body>
