@@ -75,9 +75,9 @@ export default function GACMPage() {
             { id: 'm_1', type: 'Meeting', label: 'Academic Advisory Senate Agenda', properties: { title: 'Academic Advisory Senate Agenda' } }
           ];
           const fallbackEdges: GACMEdge[] = [
-            { source: 'f_1', target: 'p_1', relation: 'PRINCIPAL_INVESTIGATOR' },
-            { source: 'p_1', target: 'd_1', relation: 'HOSTED_BY' },
-            { source: 'f_1', target: 'm_1', relation: 'SPEAKER_AT' }
+            { id: 'e_1', source: 'f_1', target: 'p_1', relation: 'PRINCIPAL_INVESTIGATOR' },
+            { id: 'e_2', source: 'p_1', target: 'd_1', relation: 'HOSTED_BY' },
+            { id: 'e_3', source: 'f_1', target: 'm_1', relation: 'SPEAKER_AT' }
           ];
           setNodes(fallbackNodes);
           setEdges(fallbackEdges);
@@ -90,8 +90,8 @@ export default function GACMPage() {
           { id: 'd_1', type: 'Department', label: 'Department of Marine Sciences', properties: { name: 'Department of Marine Sciences' } }
         ];
         const fallbackEdges: GACMEdge[] = [
-          { source: 'f_1', target: 'p_1', relation: 'PRINCIPAL_INVESTIGATOR' },
-          { source: 'p_1', target: 'd_1', relation: 'HOSTED_BY' }
+          { id: 'e_1', source: 'f_1', target: 'p_1', relation: 'PRINCIPAL_INVESTIGATOR' },
+          { id: 'e_2', source: 'p_1', target: 'd_1', relation: 'HOSTED_BY' }
         ];
         setNodes(fallbackNodes);
         setEdges(fallbackEdges);
