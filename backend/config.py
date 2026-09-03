@@ -54,6 +54,13 @@ class Settings(BaseSettings):
     memgraph_host: str = "localhost"
     memgraph_port: int = 7687
 
+    # API Keys & Models for Rotation & Tool Calling
+    groq_api_key_1: SecretStr | None = None
+    groq_api_key_2: SecretStr | None = None
+    groq_api_key_3: SecretStr | None = None
+    groq_model: str = "openai/gpt-oss-120b"
+    google_api_key: SecretStr | None = None
+
 
 settings = Settings()  # type: ignore[call-arg] # Loaded from .env file``
 

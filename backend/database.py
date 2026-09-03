@@ -1,10 +1,12 @@
-## database.py imports (async)
-# aiosqlite: provide async driver for the sqllite then SQLAlchemy can use this driver async operation for postgress we use psycopg
+import sys
+import asyncio
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
-# from sqlalchemy import create_engine
-# from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from config import  settings
+from config import settings
 notes="""
 [ Fresh HTTP Client Request ]
                │

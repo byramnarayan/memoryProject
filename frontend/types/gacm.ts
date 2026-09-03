@@ -73,14 +73,27 @@ export interface VectorCitation {
   similarity_score?: number;
 }
 
+export interface GoogleCitation {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
 export interface GACMQueryResponse {
+  query?: string;
   synthesized_answer: string;
-  vector_citations: VectorCitation[];
+  matched_citations?: VectorCitation[];
+  vector_citations?: VectorCitation[];
+  pgvector_citations?: VectorCitation[];
+  google_online_citations?: GoogleCitation[];
   graph_nodes: GACMNode[];
   graph_edges: GACMEdge[];
-  provenance_path: {
+  stages?: string[];
+  is_out_of_scope?: boolean;
+  provenance_path?: {
     nodes: GACMNode[];
     edges: GACMEdge[];
   };
-  confidence_score: number;
+  confidence_score?: number;
+  execution_time_ms?: number;
 }

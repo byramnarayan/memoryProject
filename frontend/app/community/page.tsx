@@ -26,9 +26,9 @@ export default function CommunityPage() {
   }, []);
 
   const filteredTopics = topics.filter(t =>
-    t.title.toLowerCase().includes(search.toLowerCase()) ||
-    t.category.toLowerCase().includes(search.toLowerCase()) ||
-    t.description.toLowerCase().includes(search.toLowerCase())
+    (t.title || '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.category || '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.description || '').toLowerCase().includes(search.toLowerCase())
   );
 
   return (

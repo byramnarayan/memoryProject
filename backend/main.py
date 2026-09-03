@@ -1,3 +1,9 @@
+import sys
+import asyncio
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from contextlib import asynccontextmanager
 # asynccontextmanager: for life span function
 from fastapi import FastAPI,Request,status
@@ -26,23 +32,57 @@ from fastapi.templating import Jinja2Templates
 
 
 
-from database import engine
+from database import engine, Base, AsyncSessionLocal
 from routers import users, gacm
+from sqlalchemy import text, select
+from models import User
+from pwdlib import PasswordHash
 
+password_hash_mgr = PasswordHash.recommended()
 
-# Base.metadata.create_all(bind=engine)
-# lifespan: morden FastAPi way t handle startup and shutdown event 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    # 1. Automatically create and verify all PostgreSQL database tables on startup
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    # 2. Verify 'users' table schema & fix missing username column if needed
+    async with AsyncSessionLocal() as session:
+        try:
+            res = await session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users';"))
+            cols = [r[0] for r in res.fetchall()]
+            if 'username' not in cols and len(cols) > 0:
+                await session.execute(text("DROP TABLE IF EXISTS password_reset_tokens CASCADE;"))
+                await session.execute(text("DROP TABLE IF EXISTS users CASCADE;"))
+                await session.commit()
+                async with engine.begin() as conn:
+                    await conn.run_sync(Base.metadata.create_all)
+
+            # 3. Seed default user (CoreyMSchafer: m@m.com / 12345678) if empty
+            user_res = await session.execute(select(User).where(User.email == "m@m.com"))
+            existing_user = user_res.scalar_one_or_none()
+            if not existing_user:
+                hashed = password_hash_mgr.hash("12345678")
+                new_user = User(
+                    username="CoreyMSchafer",
+                    email="m@m.com",
+                    password_hash=hashed,
+                    image_file=None
+                )
+                session.add(new_user)
+                await session.commit()
+        except Exception as e:
+            print(f" [Startup Note]: {e}")
+
     yield
     await engine.dispose()
 
 app = FastAPI(lifespan=lifespan)
 
-# Enable CORS so Next.js frontend (port 3000) can communicate with FastAPI backend (port 8000)
+# Enable CORS for Next.js frontend (ports 3000 & 3001)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

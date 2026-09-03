@@ -59,25 +59,31 @@ export default function GACMPage() {
   useEffect(() => {
     async function loadInitialData() {
       setIsDataLoading(true);
+      
+      // 1. Fetch initial default graph query FIRST to guarantee Cytoscape visualization
       try {
-        const [expertsData, decayData, commData, historyData] = await Promise.all([
-          fetchExpertRankings(10),
-          fetchDecayRisks(10),
-          fetchCommunities(),
-          fetchChatHistory()
-        ]);
-        setExpertRankings(expertsData || []);
-        setDecayNodes(decayData || []);
-        setCommunities(commData || []);
-        setChatHistory(historyData || []);
-
-        // Load default initial query to populate graph prominently in background
         const defaultQuery = await fetchGACMQuery('oceanography marine research', 5);
         if (defaultQuery) {
           setQueryResult(defaultQuery);
           setNodes(defaultQuery.graph_nodes || []);
           setEdges(defaultQuery.graph_edges || []);
         }
+      } catch (err) {
+        console.warn('Initial Graph Fetch Note:', err);
+      }
+
+      // 2. Fetch algorithm & sidebar stats with safe catch fallbacks
+      try {
+        const [expertsData, decayData, commData, historyData] = await Promise.all([
+          fetchExpertRankings(10).catch(() => []),
+          fetchDecayRisks(10).catch(() => []),
+          fetchCommunities().catch(() => []),
+          fetchChatHistory().catch(() => [])
+        ]);
+        setExpertRankings(expertsData || []);
+        setDecayNodes(decayData || []);
+        setCommunities(commData || []);
+        setChatHistory(historyData || []);
       } catch (err) {
         console.warn('GACM Initial Load Warning:', err);
       } finally {

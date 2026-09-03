@@ -36,6 +36,7 @@ export async function fetchDecayRisks(topK: number = 10): Promise<KnowledgeDecay
 export async function fetchCommunities(): Promise<CommunityCluster[]> {
   const res = await apiFetch<any>('/api/gacm/communities', {
     method: 'GET',
+    skipAuth: true
   });
   return Array.isArray(res) ? res : (res?.communities || []);
 }

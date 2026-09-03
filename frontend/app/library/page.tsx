@@ -6,7 +6,7 @@ import { CommunityCluster } from '@/types/gacm';
 import { Layers, Database, Search, Building, BookOpen, X, Info, Award } from '@/components/gacm/Icons';
 
 export default function LibraryPage() {
-  const [activeTab, setActiveTab] = useState<'clusters' | 'projects'>('clusters');
+  const [activeTab, setActiveTab] = useState<'clusters' | 'projects'>('projects');
   
   // Clusters state
   const [communities, setCommunities] = useState<CommunityCluster[]>([]);

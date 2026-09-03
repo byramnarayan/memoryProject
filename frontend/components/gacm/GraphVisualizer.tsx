@@ -63,7 +63,9 @@ export default function GraphVisualizer({
 
     // Destroy existing instance
     if (cyRef.current) {
-      cyRef.current.destroy();
+      try {
+        cyRef.current.destroy();
+      } catch (_) {}
     }
 
     // Initialize Cytoscape with COSE physics layout to spread out nodes comfortably

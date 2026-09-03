@@ -9,12 +9,12 @@ MEMGRAPH_URI = f"bolt://{settings.memgraph_host}:{settings.memgraph_port}"
 # Singleton Driver instance to prevent connection leaks & pool exhaustion
 _driver_instance = None
 
+_MEMGRAPH_AVAILABLE = True
+
 def get_memgraph_driver():
-    """
-    Returns a singleton neo4j Driver instance for Memgraph v3.12.
-    Reuses connection pool across requests.
-    """
-    global _driver_instance
+    global _driver_instance, _MEMGRAPH_AVAILABLE
+    if not _MEMGRAPH_AVAILABLE:
+        return None
     if _driver_instance is None:
         try:
             _driver_instance = GraphDatabase.driver(
@@ -23,24 +23,27 @@ def get_memgraph_driver():
                 encrypted=False,
                 max_connection_pool_size=50
             )
+            with _driver_instance.session() as session:
+                session.run("RETURN 1")
             logger.info(f"Connected to Memgraph singleton driver at {MEMGRAPH_URI}")
         except Exception as e:
-            logger.error(f"Failed to connect to Memgraph at {MEMGRAPH_URI} - Error: {e}")
-            raise e
+            logger.warning(f"Memgraph offline at {MEMGRAPH_URI}: {e}")
+            _MEMGRAPH_AVAILABLE = False
+            _driver_instance = None
+            return None
     return _driver_instance
 
 def execute_cypher(query: str, parameters: dict = None):
-    """
-    Executes a Cypher query against Memgraph and returns results as a list of dicts.
-    """
     driver = get_memgraph_driver()
+    if not driver:
+        return []
     try:
         with driver.session() as session:
             result = session.run(query, parameters or {})
             return [record.data() for record in result]
     except Exception as e:
-        logger.error(f"Error executing Cypher query: {query[:100]}... | Error: {e}")
-        raise e
+        logger.warning(f"Memgraph query note: {e}")
+        return []
 
 def init_memgraph_schema():
     """
