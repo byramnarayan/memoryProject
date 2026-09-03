@@ -1,9 +1,10 @@
 .env
-
-.vscode 
-
-
-
-.venv 
-
+*.env*
+*.backup
+snapshots/
+snapshots/*
+.vscode
+.venv
 uv.lock
+__pycache__/
+*.pyc
