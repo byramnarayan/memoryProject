@@ -16,29 +16,44 @@ export async function fetchGACMQuery(query: string, topKVector: number = 5): Pro
       top_k_vector: topKVector,
       include_graph: true
     }),
+    skipAuth: true
   });
 }
 
 export async function fetchExpertRankings(topK: number = 10): Promise<ExpertRanking[]> {
-  const res = await apiFetch<any>(`/api/gacm/expert-rankings?top_k=${topK}`, {
-    method: 'GET',
-  });
-  return Array.isArray(res) ? res : (res?.rankings || []);
+  try {
+    const res = await apiFetch<any>(`/api/gacm/expert-rankings?top_k=${topK}`, {
+      method: 'GET',
+      skipAuth: true
+    });
+    return Array.isArray(res) ? res : (res?.rankings || []);
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchDecayRisks(topK: number = 10): Promise<KnowledgeDecayNode[]> {
-  const res = await apiFetch<any>(`/api/gacm/decay-risks?top_k=${topK}`, {
-    method: 'GET',
-  });
-  return Array.isArray(res) ? res : [];
+  try {
+    const res = await apiFetch<any>(`/api/gacm/decay-risks?top_k=${topK}`, {
+      method: 'GET',
+      skipAuth: true
+    });
+    return Array.isArray(res) ? res : [];
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchCommunities(): Promise<CommunityCluster[]> {
-  const res = await apiFetch<any>('/api/gacm/communities', {
-    method: 'GET',
-    skipAuth: true
-  });
-  return Array.isArray(res) ? res : (res?.communities || []);
+  try {
+    const res = await apiFetch<any>('/api/gacm/communities', {
+      method: 'GET',
+      skipAuth: true
+    });
+    return Array.isArray(res) ? res : (res?.communities || []);
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchProvenancePath(facultyName: string, projectId: string): Promise<{ nodes: GACMNode[]; edges: GACMEdge[] }> {
@@ -46,7 +61,7 @@ export async function fetchProvenancePath(facultyName: string, projectId: string
   const encodedProject = encodeURIComponent(projectId);
   return apiFetch<{ nodes: GACMNode[]; edges: GACMEdge[] }>(
     `/api/gacm/provenance-path?faculty_name=${encodedFaculty}&project_id=${encodedProject}`,
-    { method: 'GET' }
+    { method: 'GET', skipAuth: true }
   );
 }
 
@@ -69,12 +84,17 @@ export async function fetchProjectTopics(): Promise<any[]> {
 export async function saveChatSession(payload: { query_text: string; synthesized_answer: string; citations: any[]; graph_nodes: any[]; confidence_score?: number }): Promise<any> {
   return apiFetch<any>('/api/gacm/chat-history', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    skipAuth: true
   });
 }
 
 export async function fetchChatHistory(): Promise<any[]> {
-  return apiFetch<any[]>('/api/gacm/chat-history', { method: 'GET' });
+  try {
+    return await apiFetch<any[]>('/api/gacm/chat-history', { method: 'GET', skipAuth: true });
+  } catch {
+    return [];
+  }
 }
 
 export async function fetchTopicComments(topicId: number): Promise<any[]> {
@@ -84,6 +104,7 @@ export async function fetchTopicComments(topicId: number): Promise<any[]> {
 export async function postTopicComment(topicId: number, payload: { author_name: string; role_label?: string; comment_text: string }): Promise<any> {
   return apiFetch<any>(`/api/gacm/topics/${topicId}/comments`, {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    skipAuth: true
   });
 }

@@ -33,7 +33,7 @@ export default function GraphVisualizer({
 
     // Nodes
     nodes.forEach((n) => {
-      let displayLabel = n.properties.name || n.properties.title || n.properties.id || n.id;
+      let displayLabel = n.properties?.name || n.properties?.title || n.label || String(n.id);
       if (displayLabel.length > 25) {
         displayLabel = displayLabel.substring(0, 22) + '...';
       }

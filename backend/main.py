@@ -37,42 +37,48 @@ from routers import users, gacm
 from sqlalchemy import text, select
 from models import User
 from pwdlib import PasswordHash
+import logging
+
+logger = logging.getLogger("uvicorn")
 
 password_hash_mgr = PasswordHash.recommended()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     # 1. Automatically create and verify all PostgreSQL database tables on startup
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
 
-    # 2. Verify 'users' table schema & fix missing username column if needed
-    async with AsyncSessionLocal() as session:
-        try:
-            res = await session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users';"))
-            cols = [r[0] for r in res.fetchall()]
-            if 'username' not in cols and len(cols) > 0:
-                await session.execute(text("DROP TABLE IF EXISTS password_reset_tokens CASCADE;"))
-                await session.execute(text("DROP TABLE IF EXISTS users CASCADE;"))
-                await session.commit()
-                async with engine.begin() as conn:
-                    await conn.run_sync(Base.metadata.create_all)
+        # 2. Verify 'users' table schema & fix missing username column if needed
+        async with AsyncSessionLocal() as session:
+            try:
+                res = await session.execute(text("SELECT column_name FROM information_schema.columns WHERE table_name='users';"))
+                cols = [r[0] for r in res.fetchall()]
+                if 'username' not in cols and len(cols) > 0:
+                    await session.execute(text("DROP TABLE IF EXISTS password_reset_tokens CASCADE;"))
+                    await session.execute(text("DROP TABLE IF EXISTS users CASCADE;"))
+                    await session.commit()
+                    async with engine.begin() as conn:
+                        await conn.run_sync(Base.metadata.create_all)
 
-            # 3. Seed default user (CoreyMSchafer: m@m.com / 12345678) if empty
-            user_res = await session.execute(select(User).where(User.email == "m@m.com"))
-            existing_user = user_res.scalar_one_or_none()
-            if not existing_user:
-                hashed = password_hash_mgr.hash("12345678")
-                new_user = User(
-                    username="CoreyMSchafer",
-                    email="m@m.com",
-                    password_hash=hashed,
-                    image_file=None
-                )
-                session.add(new_user)
-                await session.commit()
-        except Exception as e:
-            print(f" [Startup Note]: {e}")
+                # 3. Seed default user (CoreyMSchafer: m@m.com / 12345678) if empty
+                user_res = await session.execute(select(User).where(User.email == "m@m.com"))
+                existing_user = user_res.scalar_one_or_none()
+                if not existing_user:
+                    hashed = password_hash_mgr.hash("12345678")
+                    new_user = User(
+                        username="CoreyMSchafer",
+                        email="m@m.com",
+                        password_hash=hashed,
+                        image_file=None
+                    )
+                    session.add(new_user)
+                    await session.commit()
+            except Exception as inner_e:
+                logger.warning(f"Database user init note: {inner_e}")
+    except Exception as e:
+        logger.warning(f"PostgreSQL connection note during startup: {e}")
 
     yield
     await engine.dispose()
