@@ -10,82 +10,95 @@ The **Graph-Augmented Institutional Knowledge Base (GACM)** is a hybrid GraphRAG
 ```mermaid
 graph TD
     subgraph Client ["Frontend Presentation Layer (Next.js 16 App Router)"]
-        UI_EXPLORER["GACM Explorer (AgriAssist 2-Tier Drawer Dashboard)"]
-        UI_LIBRARY["Resource Library (/library - Clusters & Projects)"]
-        UI_COMMUNITY["Community Topics (/community & /post/[id])"]
+        UI_EXPLORER["GACM Explorer (/gacm - 2-Tier Dashboard)"]
+        UI_LIBRARY["Resource Library (/library - Projects Grid & Evidence Drawer)"]
+        UI_COMMUNITY["Community Forum (/community - Research Topic Spaces)"]
         CYTOSCAPE["Cytoscape.js Physics Canvas Engine"]
     end
 
-    subgraph Backend ["Backend Processing Layer (FastAPI + Groq LLM)"]
+    subgraph Backend ["Backend Processing Layer (FastAPI + Google ADK + Groq LLM)"]
         ROUTER_GACM["FastAPI GACM Router (/api/gacm)"]
-        GROQ_SERVICE["Groq AI Service (qwen/qwen3.8-27b)"]
+        GOOGLE_ADK["Google ADK Tool-Calling Agent Engine"]
+        GROQ_SERVICE["Groq AI Rotation Service (openai/gpt-oss-120b)"]
+        SCHOLAR_SEARCH["Google Scholar Live Grounding Search"]
         ALGO_ENGINE["Graph Algorithms Engine (PageRank, SPOF, Louvain)"]
-        EMBED_MODEL["SentenceTransformer (BAAI/bge-small-en-v1.5)"]
     end
 
-    subgraph Storage ["Multi-Store Persistence Layer"]
-        PG["PostgreSQL Database (Port 5432)
-        - document_embeddings (21,422 384d Vectors)
+    subgraph CloudStorage ["Cloud Multi-Store Persistence Layer"]
+        NEON_PG["Neon Cloud PostgreSQL
+        - document_embeddings (17,973 Records)
         - gacm_chat_sessions (AI Chat History)
-        - topic_discussion_comments (User Comments)
-        - users (Auth & Multi-Tenancy)"]
+        - users (Auth & Superuser m@m.com)"]
         
-        MEMGRAPH["Memgraph Graph DB (Port 7687 Bolt)
-        - 28,863 Graph Nodes
-        - 33,627 Directed Relationships
-        - 5,756 Faculty Entities (0 Overlap)"]
+        NEO4J_CLOUD["Neo4j Aura Cloud Graph DB
+        - 17,973 Graph Nodes (:Faculty, :Project, :Meeting, :Department)
+        - Directed Relationships (:PRINCIPAL_INVESTIGATOR, :SPEAKER_AT, :HOSTED_BY)"]
+
+        QDRANT_CLOUD["Qdrant Cloud Vector Database
+        - 384-dimensional Dense Vectors (utc_research_vectors)
+        - Metadata Payloads (grant_id, award_amount, abstract)"]
     end
 
     Client <--> Backend
-    Backend <--> Storage
+    Backend <--> CloudStorage
+    GOOGLE_ADK --> SCHOLAR_SEARCH
     GROQ_SERVICE --> GroqAPI["Groq Cloud LLM API"]
 ```
 
 ---
 
-## 2. Multi-Store Data Storage Layer
+## 2. Multi-Store Cloud Persistence Layer
 
-### A. PostgreSQL Relational & Vector Store (Port 5432)
-- **Database Name**: `community`
+### A. Neon Cloud PostgreSQL Database (Serverless SSL)
+- **Database URL**: Configured via `DATABASE_URL` in `.env`.
 - **Tables**:
-  1. `document_embeddings`: Stores 21,422 project records (18,500 NSF Awards + 2,922 MISeD Meeting Dialog Turns) along with 384-dimensional `BAAI/bge-small-en-v1.5` vector embeddings (`embedding_json`). Strictly isolated per user via `user_id`.
+  1. `document_embeddings`: Stores 17,973 project records (15,051 NSF Awards + 2,922 MISeD Meeting Dialog Turns) along with 384-dimensional `embedding_json` vectors. Isolated per user via `user_id`.
   2. `gacm_chat_sessions`: Stores user AI query prompts, synthesized answers, confidence scores, evidence citations, and Cytoscape graph nodes for permanent chat history retrieval.
-  3. `topic_discussion_comments`: Stores community discussion threads and comments on topic spaces.
-  4. `users`: Stores user credentials, email, and authentication profiles.
+  3. `users`: Stores user credentials, email, hashed passwords (`argon2`), and superuser status (`m@m.com` / `12345678`).
 
-### B. Memgraph In-Memory Knowledge Graph (Port 7687 Bolt)
-- **Total Nodes**: 28,863 Nodes
-- **Total Relationships**: 33,627 Directed Relationships
+### B. Neo4j Aura Cloud Knowledge Graph (`neo4j+s://`)
+- **Total Nodes**: 17,973 Nodes
 - **Node Labels**:
   - `(:Faculty)`: Individual researchers, professors, and meeting panel speakers.
-  - `(:Project)`: Research grants and QA meeting dialog turns.
-  - `(:Grant)`: Funding award metadata.
+  - `(:Project)`: NSF Research grant awards.
+  - `(:Meeting)`: MISeD academic, product & parliamentary meeting QA dialog turns.
   - `(:Department)`: University departments and host institutions.
 - **Relationships**:
   - `(:Faculty)-[:PRINCIPAL_INVESTIGATOR]->(:Project)`
   - `(:Project)-[:HOSTED_BY]->(:Department)`
-  - `(:Faculty)-[:MEMBER_OF]->(:Department)`
+  - `(:Faculty)-[:SPEAKER_AT]->(:Meeting)`
+  - `(:Meeting)-[:HOSTED_BY]->(:Department)`
+
+### C. Qdrant Cloud Vector Database (`https://cloud.qdrant.io`)
+- **Collection Name**: `utc_research_vectors`
+- **Vector Dimension**: 384-dimensional dense vectors (Cosine Distance).
+- **Payload Metadata**: `grant_id`, `project_title`, `faculty_name`, `institution`, `award_amount`, `abstract`, `is_meeting`.
 
 ---
 
-## 3. Graph Algorithms & AI Synthesis Engine
+## 3. Key Project Features & Intelligent Engines
 
-1. **PageRank Centrality Expert Finder (`CALL pagerank.get()`)**:
-   - Computes structural node authority across the 28.8k node graph to identify top institutional experts and key faculty figures.
-2. **Single Point of Failure (SPOF) Knowledge Decay Analysis**:
-   - Identifies high-risk faculty members who hold undocumented project context with zero secondary collaborators.
-3. **Louvain Interdisciplinary Community Detection**:
-   - Partitions 28,863 graph nodes into 1,348 autonomous research community clusters using modularity optimization.
-4. **Groq AI Hybrid Synthesis (`GroqService`)**:
-   - Combines vector search evidence citations from PostgreSQL with 2-hop Cypher graph paths from Memgraph.
-   - Synthesizes citation-backed answers using `qwen/qwen3.8-27b` (with fallback to `openai/gpt-oss-20b`).
+1. **Google ADK Tool-Calling Agent Engine (`google_adk_agent.py`)**:
+   - Executes 4-stage tool-calling execution pipeline:
+     1. `Thinking & Intent Analysis`
+     2. `Traversing Neo4j Aura Cypher Graph`
+     3. `Searching Neon PostgreSQL & Qdrant Vectors`
+     4. `Grounding via Google Scholar Academic Search`
+   - Emits real-time progress indicators to the frontend UI.
 
----
+2. **Regex Term Highlighting (`formatHighlightedMarkdown`)**:
+   - Automatically parses `**text**` syntax in AI synthesized responses.
+   - Highlights key **faculty names**, **awards**, and **departments** in styled amber mark badges (`<mark>`).
 
-## 4. Frontend Application Architecture
+3. **Internal Meeting Query Rule**:
+   - Queries containing meeting keywords (`meeting`, `agenda`, `senate`, `dialog`, `minutes`, `committee`) automatically skip web search and synthesize answers strictly using internal PostgreSQL vectors and Neo4j graph nodes.
 
-- **Next.js 16 (App Router) & Tailwind CSS**:
-  - Full-width edge-to-edge dashboard (`/gacm`) featuring AgriAssist-style background graph canvas and 2-tier drawer sidebar navigation.
-  - Cytoscape.js physics visualizer with COSE repulsion layout (`nodeRepulsion: 14000`) preventing text overlap.
-  - Resource Library (`/library`) displaying all 1,348 Louvain research clusters and 21,422 project records with modal drawers.
-  - Community Spaces (`/community` & `/post/[id]`) rendering dynamic project topic spaces, linked graph citations, and PostgreSQL comments.
+4. **Out-of-Scope Security Guardrail Banners**:
+   - Queries unrelated to UTC research grants or meeting agendas automatically trigger the **`⚠️ OUT OF PROJECT SCOPE QUESTION DETECTED`** banner, blocking dummy fallback answers.
+
+5. **Resource Library Grid & Evidence Modal Drawer (`/library`)**:
+   - Displays all 17,973 institutional records in a responsive grid.
+   - Clicking any project card opens an interactive modal drawer displaying full abstract snippets, PI names, grant IDs, and award amounts.
+
+6. **Offline Setup Snapshot System (`snapshot_offline_setup.py`)**:
+   - Automatically backs up local configurations, `.env` files, and database states into `backend/snapshots/` before cloud migrations.
