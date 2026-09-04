@@ -96,12 +96,9 @@ notes="""
 
 # Create the core engine manager
 engine = create_async_engine(
-    # database_url: get this from the .env database url 
-    settings.database_url
-    # SQLALCHEMY_DATABASE_URL, # not need for postgress
-    # check_same_thread=False is strictly required ONLY for SQLite.
-    # It allows multiple background asynchronous threads to access the database safely.
-    # connect_args={"check_same_thread": False}, # not need for postgress
+    settings.database_url,
+    pool_pre_ping=True,      # Tests connection liveness before checkout; reconnects if Neon dropped the connection
+    pool_recycle=300,        # Automatically refreshes pooled connections every 5 minutes
 )
 
 # Factory configuration for generating individual database transactions.

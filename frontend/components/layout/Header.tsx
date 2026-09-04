@@ -19,10 +19,10 @@ export default function Header() {
               
               {/* Brand & Left Nav */}
               <div className="flex items-center">
-                <Link href="/" className="mr-8 flex items-center font-bold text-gold text-xl gap-2">
+                <Link href="/" className="mr-8 flex items-center font-bold text-gold text-xl gap-2 tracking-tight">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/icon.svg" alt="Wakamono Logo" className="h-6 w-6" />
-                  Wakamono
+                  <img src="/icon.svg" alt="MnemoGraph Logo" className="h-6 w-6" />
+                  MnemoGraph
                 </Link>
                 <div className="hidden md:flex items-center space-x-6">
                   <Link href="/gacm" className="text-gold font-bold text-sm tracking-wide transition-colors hover:text-yellow-400">GRAPH EXPLORER</Link>
@@ -74,6 +74,7 @@ export default function Header() {
             {isMobileMenuOpen && (
               <div className="md:hidden pb-6">
                 <div className="flex flex-col space-y-4 mt-4">
+                  <Link href="/gacm" className="text-gold font-bold text-sm tracking-wide block hover:text-yellow-400">GRAPH EXPLORER</Link>
                   <Link href="/" className="text-white font-medium text-sm tracking-wide block hover:text-gold">NEWS</Link>
                   <Link href="/library" className="text-white font-medium text-sm tracking-wide block hover:text-gold">LIBRARY</Link>
                   <Link href="/community" className="text-white font-medium text-sm tracking-wide block hover:text-gold">COMMUNITY</Link>

@@ -13,7 +13,8 @@ import {
   fetchCommunities,
   fetchProvenancePath,
   fetchChatHistory,
-  saveChatSession
+  saveChatSession,
+  deleteChatSession
 } from '@/lib/gacmApi';
 import {
   GACMNode,
@@ -34,7 +35,8 @@ import {
   Database,
   X,
   Info,
-  History
+  History,
+  Trash2
 } from '@/components/gacm/Icons';
 
 type SectionType = 'search' | 'history' | 'experts' | 'spof' | 'communities' | 'stats' | null;
@@ -124,18 +126,55 @@ export default function GACMPage() {
     try {
       const res = await fetchGACMQuery(queryText, 5);
       setQueryResult(res);
-      setNodes(res.graph_nodes || []);
-      setEdges(res.graph_edges || []);
-      if (res.graph_nodes && res.graph_nodes.length > 0) {
-        setHighlightIds(res.graph_nodes.map(n => String(n.id)));
+      
+      // If query was flagged by security guardrails as out-of-scope:
+      if (res.is_out_of_scope) {
+        setNodes([]);
+        setEdges([]);
+        setHighlightIds([]);
+        return;
       }
 
-      // Save AI Chat Session to PostgreSQL Database
+      let finalNodes: GACMNode[] = res.graph_nodes || [];
+      let finalEdges: GACMEdge[] = res.graph_edges || [];
+      const citations = res.pgvector_citations || res.vector_citations || res.matched_citations || [];
+
+      if (finalNodes.length > 0) {
+        setNodes(finalNodes);
+        setEdges(finalEdges);
+        setHighlightIds(finalNodes.map(n => String(n.id)));
+      } else if (citations.length > 0) {
+        // Build graph nodes from citations if graph_nodes was empty
+        const generatedNodes: GACMNode[] = [];
+        const generatedEdges: GACMEdge[] = [];
+        citations.forEach((c: any, i: number) => {
+          const fid = `fac_${i}`;
+          const pid = `proj_${i}`;
+          const did = `dept_${i}`;
+          generatedNodes.push(
+            { id: fid, type: 'Faculty', label: c.faculty_name || 'Faculty PI', properties: { name: c.faculty_name, institution: c.institution } },
+            { id: pid, type: 'Project', label: (c.project_title || 'Project').substring(0, 25), properties: { title: c.project_title, amount: c.award_amount, abstract: c.abstract_snippet } },
+            { id: did, type: 'Department', label: (c.institution || 'Department').substring(0, 22), properties: { name: c.institution } }
+          );
+          generatedEdges.push(
+            { id: `e_fp_${i}`, source: fid, target: pid, relation: 'PRINCIPAL_INVESTIGATOR' },
+            { id: `e_pd_${i}`, source: pid, target: did, relation: 'HOSTED_BY' }
+          );
+        });
+        finalNodes = generatedNodes;
+        finalEdges = generatedEdges;
+        setNodes(finalNodes);
+        setEdges(finalEdges);
+        setHighlightIds(finalNodes.map(n => String(n.id)));
+      }
+
+      // Save valid AI Chat Session to PostgreSQL Database
       await saveChatSession({
         query_text: queryText,
         synthesized_answer: res.synthesized_answer,
-        citations: res.vector_citations || [],
-        graph_nodes: res.graph_nodes || [],
+        citations: citations,
+        graph_nodes: finalNodes,
+        graph_edges: finalEdges,
         confidence_score: res.confidence_score || 1.0
       });
 
@@ -165,19 +204,93 @@ export default function GACMPage() {
 
   // Reload past saved AI chat session into view
   const handleReloadSession = (session: any) => {
+    const query = session.query_text || session.query || '';
+    const answer = session.synthesized_answer || session.answer || '';
+    const citations = session.citations || session.pgvector_citations || session.vector_citations || [];
+    let activeNodes: GACMNode[] = session.graph_nodes || [];
+    let activeEdges: GACMEdge[] = session.graph_edges || session.edges || [];
+
+    // If edges are missing, reconstruct them from citations or nodes
+    if (activeEdges.length === 0 && citations.length > 0) {
+      const generatedNodes: GACMNode[] = [];
+      const generatedEdges: GACMEdge[] = [];
+      citations.forEach((c: any, i: number) => {
+        const fid = `fac_${i}`;
+        const pid = `proj_${i}`;
+        const did = `dept_${i}`;
+        generatedNodes.push(
+          { id: fid, type: 'Faculty', label: c.faculty_name || 'Faculty PI', properties: { name: c.faculty_name, institution: c.institution } },
+          { id: pid, type: 'Project', label: (c.project_title || 'Project').substring(0, 25), properties: { title: c.project_title, amount: c.award_amount, abstract: c.abstract_snippet } },
+          { id: did, type: 'Department', label: (c.institution || 'Department').substring(0, 22), properties: { name: c.institution } }
+        );
+        generatedEdges.push(
+          { id: `e_fp_${i}`, source: fid, target: pid, relation: 'PRINCIPAL_INVESTIGATOR' },
+          { id: `e_pd_${i}`, source: pid, target: did, relation: 'HOSTED_BY' }
+        );
+      });
+      if (activeNodes.length === 0) {
+        activeNodes = generatedNodes;
+      }
+      activeEdges = generatedEdges;
+    } else if (activeEdges.length === 0 && activeNodes.length > 0) {
+      // Reconstruct edges from active nodes by linking Projects to Faculty and Departments
+      const faculties = activeNodes.filter(n => n.type === 'Faculty');
+      const projects = activeNodes.filter(n => n.type === 'Project' || n.type === 'Meeting');
+      const departments = activeNodes.filter(n => n.type === 'Department');
+
+      projects.forEach((p, idx) => {
+        const fac = faculties[idx % faculties.length];
+        const dept = departments[idx % departments.length];
+        if (fac) {
+          activeEdges.push({
+            id: `edge-${fac.id}-${p.id}`,
+            source: String(fac.id),
+            target: String(p.id),
+            relation: p.type === 'Meeting' ? 'SPEAKER_AT' : 'PRINCIPAL_INVESTIGATOR'
+          });
+        }
+        if (dept) {
+          activeEdges.push({
+            id: `edge-${p.id}-${dept.id}`,
+            source: String(p.id),
+            target: String(dept.id),
+            relation: 'HOSTED_BY'
+          });
+        }
+      });
+    }
+
     setQueryResult({
-      synthesized_answer: session.synthesized_answer,
-      vector_citations: session.citations || [],
-      graph_nodes: session.graph_nodes || [],
-      graph_edges: [],
+      query: query,
+      synthesized_answer: answer,
+      pgvector_citations: citations,
+      vector_citations: citations,
+      graph_nodes: activeNodes,
+      graph_edges: activeEdges,
       provenance_path: { nodes: [], edges: [] },
-      confidence_score: session.confidence_score || 1.0
+      confidence_score: session.confidence_score || 1.0,
+      is_out_of_scope: false
     });
-    if (session.graph_nodes && session.graph_nodes.length > 0) {
-      setNodes(session.graph_nodes);
-      setHighlightIds(session.graph_nodes.map((n: any) => String(n.id)));
+
+    if (activeNodes.length > 0) {
+      setNodes(activeNodes);
+      setEdges(activeEdges);
+      // Highlight only the primary Faculty nodes, allowing Projects (Blue) and Departments (Purple) to display their distinct colors
+      const facultyIds = activeNodes.filter(n => n.type === 'Faculty').map(n => String(n.id));
+      setHighlightIds(facultyIds.length > 0 ? facultyIds : [String(activeNodes[0].id)]);
     }
     setActiveSection('search');
+  };
+
+  // Delete chat session from database
+  const handleDeleteSession = async (sessionId: number) => {
+    try {
+      await deleteChatSession(sessionId);
+      const updatedHistory = await fetchChatHistory();
+      setChatHistory(updatedHistory || []);
+    } catch (err) {
+      console.error('Failed to delete chat session:', err);
+    }
   };
 
   // Toggle section drawer open/close
@@ -393,21 +506,42 @@ export default function GACMPage() {
                     <div
                       key={sess.id}
                       onClick={() => handleReloadSession(sess)}
-                      className="bg-slate-50 border border-slate-200 hover:border-gold p-3.5 shadow-sm hover:shadow-md transition-all cursor-pointer space-y-1.5 group"
+                      className="bg-slate-50 border border-slate-200 hover:border-gold p-3.5 shadow-sm hover:shadow-md transition-all cursor-pointer space-y-2 group relative"
                     >
                       <div className="flex justify-between items-center text-[10px] text-slate-500">
-                        <span className="font-mono font-bold text-amber-700">DB Session #{sess.id}</span>
-                        <span>{new Date(sess.created_at).toLocaleDateString()}</span>
+                        <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 border border-amber-200">
+                          DB Session #{sess.id}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span>{sess.created_at ? new Date(sess.created_at).toLocaleDateString() : 'Recent'}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteSession(sess.id);
+                            }}
+                            className="text-slate-400 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors"
+                            title="Delete this session from PostgreSQL"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                      <h4 className="font-bold text-navy text-xs group-hover:text-amber-700 line-clamp-1">
-                        &ldquo;{sess.query_text}&rdquo;
+                      <h4 className="font-bold text-navy text-xs group-hover:text-amber-700 line-clamp-2 leading-snug">
+                        &ldquo;{sess.query_text || sess.query}&rdquo;
                       </h4>
-                      <p className="text-slate-600 text-[11px] line-clamp-2 leading-tight">
-                        {sess.synthesized_answer}
+                      <p className="text-slate-600 text-[11px] line-clamp-2 leading-relaxed">
+                        {sess.synthesized_answer || sess.answer}
                       </p>
-                      <div className="pt-1.5 flex justify-between items-center text-[10px] text-slate-500 font-mono">
-                        <span>Citations: {sess.citations?.length || 0}</span>
-                        <span className="text-amber-700 font-bold group-hover:underline">Reload Session →</span>
+                      <div className="pt-2 border-t border-slate-200/60 flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                        <span className="flex items-center gap-1.5">
+                          <span className="text-blue-700 font-semibold">📌 {sess.citations?.length || (sess.pgvector_citations?.length || 0)} citations</span>
+                          <span>•</span>
+                          <span className="text-purple-700 font-semibold">🕸️ {sess.graph_nodes?.length || 0} nodes</span>
+                        </span>
+                        <span className="text-amber-700 font-bold group-hover:underline flex items-center gap-1">
+                          Reload Session →
+                        </span>
                       </div>
                     </div>
                   ))

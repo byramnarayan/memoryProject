@@ -38,11 +38,14 @@ export default function GraphVisualizer({
         displayLabel = displayLabel.substring(0, 22) + '...';
       }
 
+      const rawType = n.type || 'Node';
+      const normalizedType = rawType.charAt(0).toUpperCase() + rawType.slice(1);
+
       elements.push({
         data: {
           id: String(n.id),
           label: displayLabel,
-          type: n.type || 'Node',
+          type: normalizedType,
           properties: n.properties
         },
         classes: highlightNodeIds.includes(String(n.id)) ? 'highlighted' : ''
@@ -61,11 +64,38 @@ export default function GraphVisualizer({
       });
     });
 
-    // Destroy existing instance
-    if (cyRef.current) {
-      try {
-        cyRef.current.destroy();
-      } catch (_) {}
+    // If Cytoscape instance already exists, update elements cleanly without destroying canvas
+    if (cyRef.current && !cyRef.current.destroyed()) {
+      const cy = cyRef.current;
+      cy.batch(() => {
+        cy.elements().remove();
+        if (elements.length > 0) {
+          cy.add(elements as any);
+        }
+      });
+      if (elements.length > 0) {
+        try {
+          const layout = cy.layout({
+            name: 'cose',
+            animate: true,
+            animationDuration: 500,
+            refresh: 20,
+            fit: true,
+            padding: 45,
+            nodeRepulsion: () => 14000,
+            idealEdgeLength: () => 110,
+            edgeElasticity: () => 100,
+            nestingFactor: 1.2,
+            gravity: 0.2,
+            numIter: 800,
+            initialTemp: 800,
+            coolingFactor: 0.99,
+            minTemp: 1.0
+          } as any);
+          layout.run();
+        } catch (_) {}
+      }
+      return;
     }
 
     // Initialize Cytoscape with COSE physics layout to spread out nodes comfortably
@@ -94,7 +124,7 @@ export default function GraphVisualizer({
             'border-color': '#ffffff'
           }
         },
-        // Color coding per Node Entity Type
+        // Color coding per Node Entity Type (matching the UI Legend)
         {
           selector: 'node[type = "Faculty"]',
           style: {
@@ -107,6 +137,13 @@ export default function GraphVisualizer({
           style: {
             'background-color': '#2563eb', // Royal Blue
             'border-color': '#1d4ed8'
+          }
+        },
+        {
+          selector: 'node[type = "Meeting"]',
+          style: {
+            'background-color': '#4f46e5', // Indigo
+            'border-color': '#3730a3'
           }
         },
         {
@@ -127,10 +164,9 @@ export default function GraphVisualizer({
           selector: 'node.highlighted',
           style: {
             'border-width': 4,
-            'border-color': '#dc2626',
-            'background-color': '#f59e0b',
-            'width': 32,
-            'height': 32
+            'border-color': '#ef4444',
+            'width': 34,
+            'height': 34
           }
         },
         {
@@ -186,8 +222,12 @@ export default function GraphVisualizer({
     cyRef.current = cy;
 
     return () => {
-      if (cyRef.current) {
-        cyRef.current.destroy();
+      if (cyRef.current && !cyRef.current.destroyed()) {
+        try {
+          cyRef.current.removeAllListeners();
+          cyRef.current.destroy();
+        } catch (_) {}
+        cyRef.current = null;
       }
     };
   }, [nodes, edges, highlightNodeIds]);

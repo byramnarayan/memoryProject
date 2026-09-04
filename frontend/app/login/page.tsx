@@ -33,8 +33,20 @@ export default function LoginPage() {
         await login(data.access_token);
         // The useAuth hook handles the redirect to '/'
       } else {
-        const errData = await response.json();
-        setError(errData.detail || 'Invalid username or password.');
+        let errorMessage = 'Invalid username or password.';
+        try {
+          const isJson = response.headers.get('content-type')?.includes('application/json');
+          if (isJson) {
+            const errData = await response.json();
+            errorMessage = errData.detail || errorMessage;
+          } else {
+            const text = await response.text();
+            errorMessage = text || `Server error (${response.status})`;
+          }
+        } catch {
+          // Fallback if parsing fails
+        }
+        setError(errorMessage);
       }
     } catch (err: unknown) {
       if (err instanceof Error) {

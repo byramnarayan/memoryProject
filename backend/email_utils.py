@@ -81,13 +81,13 @@ This link will expire in 1 hour.
 If you didn't request this, you can safely ignore this email.
 
 Best regards,
-The Wakamono Team
+The MnemoGraph Team
 """
 
     # Call our core send_email function to actually dispatch the message
     await send_email(
         to_email=to_email,
-        subject="Reset Your Password - FastAPI Blog",
+        subject="Reset Your Password - MnemoGraph",
         plain_text=plain_text,
         html_content=html_content,
     )

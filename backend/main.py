@@ -102,9 +102,47 @@ templates = Jinja2Templates(directory="templates")
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(gacm.router, prefix="/api/gacm", tags=["gacm"])
 
-# tags: create collapsable sections
-# Prefix add that traling slash
-#
+from graph.models_gacm import DocumentEmbedding
+from sqlalchemy import func
+
+@app.get("/api/posts")
+async def get_posts(skip: int = 0, limit: int = 10):
+    """Provides paginated institutional research updates for the Home feed."""
+    async with AsyncSessionLocal() as session:
+        count_res = await session.execute(select(func.count(DocumentEmbedding.id)).where(DocumentEmbedding.user_id == 1))
+        total = count_res.scalar() or 0
+        stmt = (
+            select(DocumentEmbedding)
+            .where(DocumentEmbedding.user_id == 1)
+            .order_by(DocumentEmbedding.id.asc())
+            .offset(skip)
+            .limit(limit)
+        )
+        res = await session.execute(stmt)
+        docs = res.scalars().all()
+        posts = [
+            {
+                "id": d.id,
+                "title": d.project_title,
+                "content": d.abstract,
+                "user_id": d.user_id,
+                "created_at": d.created_at.isoformat() if d.created_at else "2026-09-01T00:00:00Z",
+                "author": {
+                    "id": 1,
+                    "username": d.faculty_name,
+                    "email": "faculty@utc.edu",
+                    "image_path": "/static/profile_pics/default.jpg"
+                }
+            }
+            for d in docs
+        ]
+        return {
+            "posts": posts,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+            "has_more": (skip + limit) < total
+        }
 
 
 

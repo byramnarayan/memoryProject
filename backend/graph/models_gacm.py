@@ -59,6 +59,7 @@ class GACMChatSession(Base):
     synthesized_answer: Mapped[str] = mapped_column(Text, nullable=False)
     citations_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     nodes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    edges_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     confidence_score: Mapped[float] = mapped_column(Float, default=1.0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

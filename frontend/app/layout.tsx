@@ -11,8 +11,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Wakamono - Community & News",
-  description: "Community + news + resource-hub website",
+  title: "MnemoGraph - Institutional Knowledge & Collective Memory",
+  description: "MnemoGraph: Graph-Augmented Collective Memory, Research Intelligence, and Knowledge Cartography platform",
   icons: {
     icon: '/icon.svg',
   },

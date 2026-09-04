@@ -53,6 +53,11 @@ class Settings(BaseSettings):
     kaggle_api_token: SecretStr | None = None
     memgraph_host: str = "localhost"
     memgraph_port: int = 7687
+    neo4j_uri: str | None = None
+    neo4j_username: str | None = None
+    neo4j_password: SecretStr | None = None
+    qdrant_url: str | None = None
+    qdrant_api_key: SecretStr | None = None
 
     # API Keys & Models for Rotation & Tool Calling
     groq_api_key_1: SecretStr | None = None

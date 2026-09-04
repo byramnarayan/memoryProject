@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Sparkles, Database, Network, Loader2 } from '@/components/gacm/Icons';
 import { GACMQueryResponse } from '@/types/gacm';
 
@@ -36,6 +36,13 @@ export default function HybridQueryBar({
   isLoading
 }: HybridQueryBarProps) {
   const [prompt, setPrompt] = useState('');
+
+  // Sync search input bar with query when a past session is reloaded
+  useEffect(() => {
+    if (queryResult?.query) {
+      setPrompt(queryResult.query);
+    }
+  }, [queryResult?.query]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,17 +114,33 @@ export default function HybridQueryBar({
           <div className="border-b border-slate-200 pb-3">
             <div className="flex flex-col items-start gap-1.5 text-slate-600 text-[11px]">
               <h4 className="font-bold text-sm text-navy mb-1 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-600" /> Google ADK Agent Synthesized Answer
+                {queryResult.is_out_of_scope ? (
+                  <>
+                    <span className="text-base">🛡️</span> Google ADK Agent: Query Scope Evaluation
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 text-amber-600" /> Google ADK Agent Synthesized Answer
+                  </>
+                )}
               </h4>
-              <span className="font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 border border-blue-200">
-                📌 PGVector: {citationsList.length} matches
-              </span>
-              <span className="font-semibold text-purple-700 bg-purple-50 px-2.5 py-0.5 border border-purple-200">
-                🕸️ Memgraph: {queryResult?.graph_nodes?.length || 0} nodes
-              </span>
-              <span className="font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 border border-emerald-200">
-                🌐 Google Web: {queryResult?.google_online_citations?.length || 0} results
-              </span>
+              {queryResult.is_out_of_scope ? (
+                <span className="font-semibold text-red-700 bg-red-50 px-2.5 py-0.5 border border-red-200">
+                  🛡️ Security Guardrail: Activated (Out of Scope)
+                </span>
+              ) : (
+                <>
+                  <span className="font-semibold text-blue-700 bg-blue-50 px-2.5 py-0.5 border border-blue-200">
+                    📌 PGVector: {citationsList.length} matches
+                  </span>
+                  <span className="font-semibold text-purple-700 bg-purple-50 px-2.5 py-0.5 border border-purple-200">
+                    🕸️ Memgraph: {queryResult?.graph_nodes?.length || 0} nodes
+                  </span>
+                  <span className="font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 border border-emerald-200">
+                    🌐 Google Web: {queryResult?.google_online_citations?.length || 0} results
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -128,7 +151,7 @@ export default function HybridQueryBar({
                 <span className="text-base">⚠️</span> OUT OF PROJECT SCOPE QUESTION DETECTED
               </div>
               <p className="text-red-800 text-xs leading-relaxed">
-                This query does not directly match UTC university research grants or meeting agendas. Below is a general AI synthesis along with live Google web grounding.
+                This query was identified as outside the scope of university research grants, faculty expertise, and meeting agendas. The institutional guardrail halted execution: no external search or synthesis was performed, and no graph nodes were created.
               </p>
             </div>
           ) : (

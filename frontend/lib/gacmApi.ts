@@ -81,7 +81,7 @@ export async function fetchProjectTopics(): Promise<any[]> {
   return apiFetch<any[]>('/api/gacm/topics', { method: 'GET', skipAuth: true });
 }
 
-export async function saveChatSession(payload: { query_text: string; synthesized_answer: string; citations: any[]; graph_nodes: any[]; confidence_score?: number }): Promise<any> {
+export async function saveChatSession(payload: { query_text: string; synthesized_answer: string; citations: any[]; graph_nodes: any[]; graph_edges?: any[]; confidence_score?: number }): Promise<any> {
   return apiFetch<any>('/api/gacm/chat-history', {
     method: 'POST',
     body: JSON.stringify(payload),
@@ -94,6 +94,14 @@ export async function fetchChatHistory(): Promise<any[]> {
     return await apiFetch<any[]>('/api/gacm/chat-history', { method: 'GET', skipAuth: true });
   } catch {
     return [];
+  }
+}
+
+export async function deleteChatSession(sessionId: number): Promise<any> {
+  try {
+    return await apiFetch<any>(`/api/gacm/chat-history/${sessionId}`, { method: 'DELETE', skipAuth: true });
+  } catch {
+    return { status: 'error' };
   }
 }
 
