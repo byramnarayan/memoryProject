@@ -1,0 +1,21 @@
+
+NATIONAL SCIENCE FOUNDATION (NSF) [Run: 61b9d4]
+Division of Quantum Information Science & Engineering
+Award Number: NSF-QIS-2026-61b9d4
+Project Title: Distributed Quantum Magnetometer Network for Subterranean Geophysics 61b9d4
+Principal Investigator: Dr. Marcus Vance
+Co-Principal Investigator: Dr. Sarah Lin
+Lead Institution: University of Tennessee at Chattanooga
+Department: Electrical & Computer Engineering
+Anticipated Award Capital: $1,850,000.00
+Start Date: 2026-11-01
+Classification: Internal - Academic Research Distribution
+
+Abstract:
+This research develops ultra-sensitive nitrogen-vacancy (NV) diamond center magnetometers
+deployed in an autonomous subterranean sensor mesh. The project validates high-coherence
+quantum spin states in noisy environments for real-time geophysical anomaly detection.
+Budget Justification:
+Personnel: $920,000 (PI Vance 2.0 mos summer, Co-PI Lin 1.5 mos, 3 PhD fellows).
+Equipment: $580,000 for cryogenic laser spectroscopy and confocal microscopes.
+Travel & Operations: $350,000 for field validation and peer-reviewed dissemination.

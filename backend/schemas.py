@@ -43,20 +43,28 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
-    password:str=Field(min_length=8)
+    password: str = Field(min_length=8)
+    role: str = Field(default="Researcher")
+    department: str = Field(default="Research Division")
+    clearance_level: str = Field(default="Internal")
+    tenant_id: str = Field(default="utc_campus")
 
 # dont want other person to see the author data so created the public and private response 
 # class UserResponse(UserBase):
 class UserPublic(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
-    username:str
-    image_file: str|None
+    username: str
+    role: str = "TenantAdmin"
+    department: str = "Research Division"
+    clearance_level: str = "HighlyConfidential"
+    tenant_id: str = "utc_campus"
+    image_file: str | None
     image_path: str
     # image_path define in model it is not database col from_attributes let read that attribute 
 
 class UserPrivate(UserPublic):
-    email:EmailStr
+    email: EmailStr
     
 
 class UserUpdate(BaseModel):

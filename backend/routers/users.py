@@ -3,7 +3,7 @@ from datetime import timedelta,UTC, datetime
 # timedelta; for token expriation
 
 from fastapi import APIRouter, Depends, BackgroundTasks,HTTPException, status, UploadFile
-from sqlalchemy import func,select
+from sqlalchemy import func,select,or_
 from sqlalchemy import delete as sql_delete
 # func: casesentive user query 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,12 +94,13 @@ async def login_for_access_token(
     #OAuth2PasswordRequestForm: as depency help in parsing login form data
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    # Look up user by email (case-insensitive)
-    # Note: OAuth2PasswordRequestForm uses "username" field, but we treat it as email
-    # look up userby email 
+    # Look up user by email or username (case-insensitive)
     result = await db.execute(
         select(models.User).where(
-            func.lower(models.User.email) == form_data.username.lower(),
+            or_(
+                func.lower(models.User.email) == form_data.username.lower(),
+                func.lower(models.User.username) == form_data.username.lower()
+            )
         ),
     )
     user = result.scalars().first()

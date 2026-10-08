@@ -1,15 +1,21 @@
 import time
 import json
 import logging
-from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Dict, Any, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, and_
 
 from database import get_db
+import models
 from graph.schemas_gacm import QueryRequest, GACMQueryResponse, KnowledgeDecayNode, DocumentCitation, GraphNode, GraphEdge
-from graph.models_gacm import DocumentEmbedding, GACMChatSession
+from graph.models_gacm import DocumentEmbedding, GACMChatSession, ResearchMemoryObject
 from graph.memgraph_db import execute_cypher
+from services.access_control import (
+    get_optional_current_user,
+    get_authorized_sensitivities,
+    log_audit_event
+)
 from graph.algorithms import (
     calculate_knowledge_decay_risks,
     run_pagerank_expert_finder,
@@ -188,16 +194,46 @@ from google_adk_agent import run_google_adk_agent
 @router.post("/query")
 async def query_gacm_engine(
     body: QueryRequest,
+    request: Request,
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
     GOOGLE ADK TOOL-CALLING HYBRID QUERY ENGINE:
-    1. Executes Tool Calling via run_google_adk_agent.
+    1. Executes Tool Calling via run_google_adk_agent with user sensitivity clearance ACLs.
     2. Emits real-time execution stages.
     3. Returns source-attributed citations & out-of-scope guardrail banners.
+    4. Logs search event to immutable audit_logs.
     """
     user_query = body.query.strip()
-    res = await run_google_adk_agent(user_query, top_k=body.top_k)
+    user_clearance = current_user.clearance_level if current_user else "Public"
+    user_department = current_user.department if current_user else None
+
+    res = await run_google_adk_agent(
+        user_query,
+        top_k=body.top_k,
+        user_clearance=user_clearance,
+        user_department=user_department
+    )
+
+    # Log search audit event
+    try:
+        ip = request.client.host if request.client else "127.0.0.1"
+        await log_audit_event(
+            session=db,
+            user=current_user,
+            action="SEARCH",
+            details={
+                "query": user_query,
+                "top_k": body.top_k,
+                "clearance": user_clearance,
+                "results_count": len(res.get("pgvector_citations", []))
+            },
+            ip_address=ip
+        )
+    except Exception as ae:
+        logger.warning(f"Could not log search audit event: {ae}")
+
     return res
 
 @router.get("/projects")
@@ -205,11 +241,86 @@ async def get_projects(
     skip: int = 0,
     limit: int = 20,
     search: str = "",
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Fetches paginated institutional project records from PostgreSQL."""
+    """Fetches paginated institutional project records from PostgreSQL respecting user clearance ACLs."""
     try:
         from sqlalchemy import func
+        user_clearance = current_user.clearance_level if current_user else "Public"
+        allowed_sensitivities = get_authorized_sensitivities(user_clearance)
+
+        # Check canonical ResearchMemoryObject first
+        mem_count_res = await db.execute(
+            select(func.count(ResearchMemoryObject.id)).where(
+                and_(
+                    ResearchMemoryObject.tenant_id == "utc_campus",
+                    ResearchMemoryObject.sensitivity_level.in_(allowed_sensitivities)
+                )
+            )
+        )
+        mem_total = mem_count_res.scalar() or 0
+
+        if mem_total > 0:
+            count_stmt = select(func.count(ResearchMemoryObject.id)).where(
+                and_(
+                    ResearchMemoryObject.tenant_id == "utc_campus",
+                    ResearchMemoryObject.sensitivity_level.in_(allowed_sensitivities)
+                )
+            )
+            stmt = select(ResearchMemoryObject).where(
+                and_(
+                    ResearchMemoryObject.tenant_id == "utc_campus",
+                    ResearchMemoryObject.sensitivity_level.in_(allowed_sensitivities)
+                )
+            )
+
+            if search.strip():
+                s = f"%{search.strip()}%"
+                filter_cond = or_(
+                    ResearchMemoryObject.title.ilike(s),
+                    ResearchMemoryObject.raw_text.ilike(s),
+                    ResearchMemoryObject.entities_json.ilike(s),
+                    ResearchMemoryObject.memory_id.ilike(s)
+                )
+                count_stmt = count_stmt.where(filter_cond)
+                stmt = stmt.where(filter_cond)
+
+            total_res = await db.execute(count_stmt)
+            total = total_res.scalar() or 0
+
+            stmt = stmt.order_by(ResearchMemoryObject.id.asc()).offset(skip).limit(limit)
+            res = await db.execute(stmt)
+            mems = res.scalars().all()
+
+            items = []
+            for m in mems:
+                entities = m.get_entities()
+                source_ref = m.get_source_ref()
+                grant_id = entities.get("grant_id") or source_ref.get("externalId") or m.memory_id
+                faculty_name = entities.get("pi_name") or "Institutional Researcher"
+                award_amount = entities.get("award_amount") or 0.0
+                institution = entities.get("institution") or "University of Tennessee at Chattanooga"
+                start_date = entities.get("start_date")
+
+                items.append({
+                    "id": m.id,
+                    "memory_id": m.memory_id,
+                    "grant_id": grant_id,
+                    "project_title": m.title,
+                    "faculty_name": faculty_name,
+                    "institution": institution,
+                    "award_amount": award_amount,
+                    "abstract": m.raw_text,
+                    "start_date": start_date,
+                    "category": m.category,
+                    "memory_type": m.memory_type,
+                    "sensitivity_level": m.sensitivity_level,
+                    "is_mised_meeting": m.memory_type == "MeetingMinutes" or "meeting" in (grant_id or "").lower()
+                })
+            return {"total": total, "skip": skip, "limit": limit, "items": items}
+
+        # Fallback to DocumentEmbedding if research_memory_objects is empty
         count_stmt = select(func.count(DocumentEmbedding.id)).where(DocumentEmbedding.user_id == DEFAULT_USER_ID)
         stmt = select(DocumentEmbedding).where(DocumentEmbedding.user_id == DEFAULT_USER_ID)
 

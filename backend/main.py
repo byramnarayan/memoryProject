@@ -33,7 +33,7 @@ from fastapi.templating import Jinja2Templates
 
 
 from database import engine, Base, AsyncSessionLocal
-from routers import users, gacm
+from routers import users, gacm, capture, memory, governance, insights
 from sqlalchemy import text, select
 from models import User
 from pwdlib import PasswordHash
@@ -95,20 +95,74 @@ app.add_middleware(
 )
 
 
+# Static file mount for media assets
 app.mount("/static", StaticFiles(directory="static"), name="static")
-
-templates = Jinja2Templates(directory="templates")
 
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(gacm.router, prefix="/api/gacm", tags=["gacm"])
+app.include_router(capture.router, prefix="/api/capture", tags=["capture"])
+app.include_router(memory.router, prefix="/api/memory", tags=["memory"])
+app.include_router(governance.router, prefix="/api/governance", tags=["governance"])
+app.include_router(insights.router, prefix="/api/insights", tags=["insights"])
 
-from graph.models_gacm import DocumentEmbedding
+from graph.models_gacm import DocumentEmbedding, ResearchMemoryObject
 from sqlalchemy import func
+
+@app.get("/", tags=["system"])
+async def root():
+    """System health & institutional memory metadata endpoint."""
+    return {
+        "system": "University Institutional Memory as a Service (MaaS/GACM)",
+        "version": "1.0.0",
+        "status": "operational",
+        "domain": "research_university",
+        "institution": "University of Tennessee at Chattanooga (UTC)"
+    }
 
 @app.get("/api/posts")
 async def get_posts(skip: int = 0, limit: int = 10):
     """Provides paginated institutional research updates for the Home feed."""
     async with AsyncSessionLocal() as session:
+        # Check canonical ResearchMemoryObject first, fallback to DocumentEmbedding
+        mem_count_res = await session.execute(select(func.count(ResearchMemoryObject.id)).where(ResearchMemoryObject.tenant_id == "utc_campus"))
+        mem_total = mem_count_res.scalar() or 0
+
+        if mem_total > 0:
+            stmt = (
+                select(ResearchMemoryObject)
+                .where(ResearchMemoryObject.tenant_id == "utc_campus")
+                .order_by(ResearchMemoryObject.id.asc())
+                .offset(skip)
+                .limit(limit)
+            )
+            res = await session.execute(stmt)
+            mems = res.scalars().all()
+            posts = []
+            for m in mems:
+                entities = m.get_entities()
+                pi_name = entities.get("pi_name") or "Institutional Researcher"
+                posts.append({
+                    "id": m.id,
+                    "title": m.title,
+                    "content": m.raw_text,
+                    "user_id": m.user_id,
+                    "created_at": m.created_at.isoformat() if m.created_at else "2026-09-01T00:00:00Z",
+                    "author": {
+                        "id": m.user_id,
+                        "username": pi_name,
+                        "email": "faculty@utc.edu",
+                        "image_path": "/static/profile_pics/default.jpg"
+                    }
+                })
+            return {
+                "posts": posts,
+                "total": mem_total,
+                "skip": skip,
+                "limit": limit,
+                "has_more": (skip + limit) < mem_total
+            }
+
+        # Fallback to legacy document_embeddings if migration is running
         count_res = await session.execute(select(func.count(DocumentEmbedding.id)).where(DocumentEmbedding.user_id == 1))
         total = count_res.scalar() or 0
         stmt = (
@@ -144,126 +198,10 @@ async def get_posts(skip: int = 0, limit: int = 10):
             "has_more": (skip + limit) < total
         }
 
-
-
-@app.get("/", include_in_schema=False, name="home")
-async def home(request: Request):
-    return templates.TemplateResponse(
-        request,
-        "home.html",
-        {
-            "title": "Home",
-        },
-    )
-## login and register template_routes
-@app.get("/login", include_in_schema=False)
-async def login_page(request: Request):
-    return templates.TemplateResponse(
-        request,
-        "login.html",
-        {"title": "Login"},
-    )
-
-
-@app.get("/register", include_in_schema=False)
-async def register_page(request: Request):
-    return templates.TemplateResponse(
-        request,
-        "register.html",
-        {"title": "Register"},
-    )
-
-
-
-@app.get("/account", include_in_schema=False)
-async def account_page(request: Request):
-    return templates.TemplateResponse(
-        request,
-        "account.html",
-        {"title": "account"},
-    )
-
-
-
-
-## main.py template routes
-@app.get("/forgot-password", include_in_schema=False)
-async def forgot_password_page(request: Request):
-    """
-    Renders the forgot password page where users can input their email.
-    We pass "title" to the template context to update the browser tab title.
-    """
-    return templates.TemplateResponse(
-        request,
-        "forgot_password.html",
-        {"title": "Forgot Password"},
-    )
-
-
-@app.get("/reset-password", include_in_schema=False)
-async def reset_password_page(request: Request):
-    """
-    Renders the reset password page where users input their new password.
-    This page is accessed via a link sent in an email, which contains a secret token in the URL.
-    """
-    response = templates.TemplateResponse(
-        request,
-        "reset_password.html",
-        {"title": "Reset Password"},
-    )
-    # Security Measure: Prevent the browser from sending the secret token in the URL 
-    # to other external sites the user might click on from this page.
-    response.headers["Referrer-Policy"] = "no-referrer"
-    return response
-
-
-
-
-
-
-
-
-
-
-
-
-
 @app.exception_handler(StarletteHTTPException)
 async def general_http_exception_handler(request: Request, exception: StarletteHTTPException):
-    
-    if request.url.path.startswith("/api"):
-        return await http_exception_handler(request, exception)
-    message = (
-            exception.detail
-            if exception.detail
-            else "An error occurred. Please check your request and try again."
-        )
+    return await http_exception_handler(request, exception)
 
-    return templates.TemplateResponse(
-        request,
-        "error.html",
-        {
-            "status_code": exception.status_code,
-            "title": exception.status_code,
-            "message": message,
-        },
-        status_code=exception.status_code,
-    )
-    # to get the correct respone for RESTAPI
-
-# handle validation error/posts/hello kind of thing
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exception: RequestValidationError):
-    if request.url.path.startswith("/api"):
-        return await request_validation_exception_handler(request, exception)
-
-    return templates.TemplateResponse(
-        request,
-        "error.html",
-        {
-            "status_code": status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "title": status.HTTP_422_UNPROCESSABLE_CONTENT,
-            "message": "Invalid request. Please check your input and try again.",
-        },
-        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-    )
+    return await request_validation_exception_handler(request, exception)

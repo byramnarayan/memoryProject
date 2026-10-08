@@ -1,6 +1,7 @@
 from __future__ import annotations
+import json
 from datetime import UTC, datetime
-from sqlalchemy import DateTime, ForeignKey, String, Integer
+from sqlalchemy import DateTime, ForeignKey, String, Integer, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 from config import settings
@@ -29,6 +30,12 @@ class User(Base):
 
     # need to add th passwored hased
     password_hash: Mapped[str]= mapped_column(String(200), nullable=False)
+
+    # University Role-Based Access Control (RBAC) & Clearance (Session 07)
+    role: Mapped[str] = mapped_column(String(50), default="TenantAdmin", nullable=False)
+    department: Mapped[str] = mapped_column(String(100), default="Research Division", nullable=False)
+    clearance_level: Mapped[str] = mapped_column(String(50), default="HighlyConfidential", nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(50), default="utc_campus", nullable=False)
 
     
 
@@ -90,6 +97,50 @@ class PasswordResetToken(Base):
     # SQLAlchemy Relationship: Allows us to easily access the User object from a token (token.user)
     # and all tokens from a user (user.reset_tokens).
     user: Mapped[User] = relationship(back_populates="reset_tokens")
+
+
+class AuditLog(Base):
+    """
+    Immutable Enterprise Audit Trail for Institutional Memory Operations (Session 07).
+    Records all access, captures, curations, sensitivity alterations, and authorization denials.
+    """
+    __tablename__ = "audit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), default="utc_campus", index=True, nullable=False)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    username: Mapped[str] = mapped_column(String(100), index=True, default="Anonymous", nullable=False)
+    user_role: Mapped[str] = mapped_column(String(50), default="Public", nullable=False)
+    department: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    clearance_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    
+    memory_id: Mapped[str | None] = mapped_column(String(100), index=True, nullable=True)
+    action: Mapped[str] = mapped_column(String(100), index=True, nullable=False)  # CAPTURE, CURATE, APPROVE, REJECT, VIEW_TEXT, SEARCH, CLEARANCE_DENIAL, LEGAL_HOLD
+    resource_type: Mapped[str] = mapped_column(String(50), default="ResearchMemoryObject", nullable=False)
+    details_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sensitivity_level: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    
+    ip_address: Mapped[str] = mapped_column(String(100), default="127.0.0.1", nullable=False)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        index=True
+    )
+
+    def set_details(self, details: dict):
+        self.details_json = json.dumps(details)
+
+    def get_details(self) -> dict:
+        return json.loads(self.details_json) if self.details_json else {}
+
+# Re-export institutional memory & GACM models
+from graph.models_gacm import (
+    ResearchMemoryObject,
+    DocumentEmbedding,
+    GACMChatSession,
+    TopicDiscussionComment,
+    CaptureJob,
+)
 
 
 

@@ -1,0 +1,15 @@
+# Deep Marine Telemetry and Autonomous Robotics for Climate Science
+
+## Abstract
+This institutional research project develops decentralized underwater sensor meshes for monitoring ocean acidification and thermal anomalies across the Pacific basin. Supported by NSF and NOAA.
+
+## Specific Aims
+1. Deploy 50 solar-assisted buoyancy gliders equipped with micro-spectrometers.
+2. Formulate low-latency acoustic mesh networks for real-time telemetry transfer.
+3. Publish open-source climate dataset archives for interdisciplinary academic research.
+
+## Budget Justification
+Total requested direct costs: $850,000 across three years. Includes graduate research assistantships, field deployments, and high-performance computing cluster allocations.
+
+## Expected Deliverables
+Comprehensive bathymetric temperature profiles, peer-reviewed publications, and open APIs for oceanographic researchers.

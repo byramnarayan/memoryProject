@@ -26,6 +26,20 @@ export default function Header() {
                 </Link>
                 <div className="hidden md:flex items-center space-x-6">
                   <Link href="/gacm" className="text-gold font-bold text-sm tracking-wide transition-colors hover:text-yellow-400">GRAPH EXPLORER</Link>
+                  <Link href="/capture" className="text-white hover:text-gold font-medium text-sm tracking-wide transition-colors">CAPTURE</Link>
+                  <Link href="/review" className="text-white hover:text-gold font-medium text-sm tracking-wide transition-colors flex items-center gap-1.5">
+                    REVIEW
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  </Link>
+                  <Link href="/audit" className="text-white hover:text-gold font-medium text-sm tracking-wide transition-colors flex items-center gap-1">
+                    AUDIT
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/40 font-mono">
+                      ACL
+                    </span>
+                  </Link>
+                  <Link href="/insights" className="text-white hover:text-gold font-medium text-sm tracking-wide transition-colors">
+                    ANALYTICS
+                  </Link>
                   <Link href="/library" className="text-white hover:text-gold font-medium text-sm tracking-wide transition-colors">LIBRARY</Link>
                   <Link href="/community" className="text-white hover:text-gold font-medium text-sm tracking-wide transition-colors">COMMUNITY</Link>
                 </div>
@@ -43,16 +57,22 @@ export default function Header() {
               </button>
 
               {/* Desktop Right Nav */}
-              <div className="hidden md:flex items-center space-x-4">
+              <div className="hidden md:flex items-center space-x-3">
                 {!isLoading && user ? (
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3">
+                    {user.role && (
+                      <span className="text-[11px] font-mono px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-300 font-semibold" title={`Department: ${user.department || 'N/A'}`}>
+                        {user.role === 'TenantAdmin' ? '🛡️ Admin' : user.role === 'DeptAdmin' ? '🏛️ Chair' : user.role === 'Auditor' ? '⚖️ Auditor' : '🔬 Researcher'}
+                        {' '}[{user.clearance_level || 'Internal'}]
+                      </span>
+                    )}
                     <button 
                       onClick={() => setIsPostModalOpen(true)}
-                      className="px-4 py-2 border border-white/30 text-white hover:border-white hover:text-white rounded-none font-bold text-sm tracking-wide transition-colors cursor-pointer"
+                      className="px-3 py-1.5 border border-white/30 text-white hover:border-white hover:text-white rounded-none font-bold text-xs tracking-wide transition-colors cursor-pointer"
                     >
                       NEW POST
                     </button>
-                    <Link href="/account" className="bg-white text-navy hover:bg-cream px-5 py-2 rounded-none font-bold text-sm tracking-wide transition-colors">
+                    <Link href="/account" className="bg-white text-navy hover:bg-cream px-4 py-1.5 rounded-none font-bold text-xs tracking-wide transition-colors">
                       {user.username}
                     </Link>
                     <button onClick={logout} className="text-white/70 hover:text-white text-xs uppercase tracking-wider cursor-pointer">Logout</button>
@@ -75,6 +95,17 @@ export default function Header() {
               <div className="md:hidden pb-6">
                 <div className="flex flex-col space-y-4 mt-4">
                   <Link href="/gacm" className="text-gold font-bold text-sm tracking-wide block hover:text-yellow-400">GRAPH EXPLORER</Link>
+                  <Link href="/capture" className="text-white font-medium text-sm tracking-wide block hover:text-gold">CAPTURE</Link>
+                  <Link href="/review" className="text-white font-medium text-sm tracking-wide block hover:text-gold flex items-center justify-between">
+                    <span>REVIEW QUEUE</span>
+                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                  </Link>
+                  <Link href="/audit" className="text-white font-medium text-sm tracking-wide block hover:text-gold">
+                    AUDIT TRAIL
+                  </Link>
+                  <Link href="/insights" className="text-white font-medium text-sm tracking-wide block hover:text-gold">
+                    RESEARCH ANALYTICS
+                  </Link>
                   <Link href="/" className="text-white font-medium text-sm tracking-wide block hover:text-gold">NEWS</Link>
                   <Link href="/library" className="text-white font-medium text-sm tracking-wide block hover:text-gold">LIBRARY</Link>
                   <Link href="/community" className="text-white font-medium text-sm tracking-wide block hover:text-gold">COMMUNITY</Link>

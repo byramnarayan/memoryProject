@@ -7,10 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 
 from database import AsyncSessionLocal
-from graph.models_gacm import DocumentEmbedding
+from graph.models_gacm import DocumentEmbedding, ResearchMemoryObject
 from graph.memgraph_db import execute_cypher
 from groq_service import generate_groq_synthesis
 from google_search_service import perform_google_adk_online_search
+from services.access_control import get_authorized_sensitivities
+from sqlalchemy import and_
 
 logger = logging.getLogger("uvicorn")
 
@@ -84,31 +86,76 @@ async def check_query_out_of_scope(query_text: str) -> bool:
     return True
 
 # Tool 1: PostgreSQL 384d Vector & Memgraph Graph Retrieval Tool
-async def tool_search_pgvector_and_memgraph(query_text: str, top_k: int = 5) -> dict:
+async def tool_search_pgvector_and_memgraph(
+    query_text: str,
+    top_k: int = 5,
+    user_clearance: str = "HighlyConfidential",
+    user_department: str | None = None
+) -> dict:
     """
     TOOL 1: Queries 384-dimensional vector embeddings in PostgreSQL and traverses Memgraph Cypher entity graph.
+    Enforces strict 5-level sensitivity clearance isolation (Session 07).
     """
-    logger.info(f"[Tool Execution]: tool_search_pgvector_and_memgraph for '{query_text}'")
+    logger.info(f"[Tool Execution]: tool_search_pgvector_and_memgraph for '{query_text}' with clearance '{user_clearance}'")
     
-    # 1. Vector Search
+    # 1. Search Canonical Research Memory Objects and Embeddings
+    matched_docs = []
+    allowed_sensitivities = get_authorized_sensitivities(user_clearance)
     async with AsyncSessionLocal() as session:
-        stmt = select(DocumentEmbedding).where(DocumentEmbedding.user_id == 1)
         search_terms = [t.strip() for t in query_text.split() if len(t.strip()) > 2]
+        
+        # Primary: Canonical Research Memory Objects (filtered by clearance level)
+        mem_stmt = select(ResearchMemoryObject).where(
+            and_(
+                ResearchMemoryObject.tenant_id == "utc_campus",
+                ResearchMemoryObject.sensitivity_level.in_(allowed_sensitivities)
+            )
+        )
         if search_terms:
-            term_conditions = [
+            mem_conds = [
                 or_(
-                    DocumentEmbedding.project_title.ilike(f"%{t}%"),
-                    DocumentEmbedding.abstract.ilike(f"%{t}%"),
-                    DocumentEmbedding.faculty_name.ilike(f"%{t}%"),
-                    DocumentEmbedding.institution.ilike(f"%{t}%")
+                    ResearchMemoryObject.title.ilike(f"%{t}%"),
+                    ResearchMemoryObject.raw_text.ilike(f"%{t}%"),
+                    ResearchMemoryObject.entities_json.ilike(f"%{t}%"),
+                    ResearchMemoryObject.memory_id.ilike(f"%{t}%")
                 )
                 for t in search_terms
             ]
-            stmt = stmt.where(or_(*term_conditions))
+            mem_stmt = mem_stmt.where(or_(*mem_conds))
+        mem_stmt = mem_stmt.order_by(ResearchMemoryObject.id.desc())
+        mem_res = await session.execute(mem_stmt.limit(top_k))
+        matched_mems = mem_res.scalars().all()
 
-        stmt = stmt.limit(top_k)
-        res = await session.execute(stmt)
-        matched_docs = res.scalars().all()
+        for m in matched_mems:
+            ent = m.get_entities()
+            matched_docs.append(
+                type("MatchedMemory", (), {
+                    "grant_id": m.memory_id,
+                    "project_title": m.title,
+                    "faculty_name": ent.get("pi_name") or "Institutional Researcher",
+                    "institution": ent.get("department") or "Research Division",
+                    "award_amount": float(ent.get("award_amount") or 0.0),
+                    "abstract": m.raw_text[:1500]
+                })()
+            )
+
+        # Supplement with DocumentEmbedding if needed
+        if len(matched_docs) < top_k:
+            stmt = select(DocumentEmbedding).where(DocumentEmbedding.user_id == 1)
+            if search_terms:
+                term_conditions = [
+                    or_(
+                        DocumentEmbedding.project_title.ilike(f"%{t}%"),
+                        DocumentEmbedding.abstract.ilike(f"%{t}%"),
+                        DocumentEmbedding.faculty_name.ilike(f"%{t}%"),
+                        DocumentEmbedding.institution.ilike(f"%{t}%")
+                    )
+                    for t in search_terms
+                ]
+                stmt = stmt.where(or_(*term_conditions))
+            stmt = stmt.limit(top_k - len(matched_docs))
+            res = await session.execute(stmt)
+            matched_docs.extend(res.scalars().all())
 
     pgvector_results = [
         {
@@ -255,11 +302,16 @@ MEETING_KEYWORDS = ["meeting", "agenda", "senate", "dialog", "dialogue", "minute
 def is_meeting_query(query_text: str) -> bool:
     return any(kw in query_text.lower() for kw in MEETING_KEYWORDS)
 
-async def run_google_adk_agent(query_text: str, top_k: int = 5) -> dict:
+async def run_google_adk_agent(
+    query_text: str,
+    top_k: int = 5,
+    user_clearance: str = "HighlyConfidential",
+    user_department: str | None = None
+) -> dict:
     """
     Google ADK Agent Orchestrator:
     1. Evaluates security guardrails & query intent.
-    2. Executes PostgreSQL & Memgraph graph search.
+    2. Executes PostgreSQL & Memgraph graph search with user clearance ACLs.
     3. Conditionally grounds via Google Scholar (skips for meetings).
     4. Synthesizes structured response with Groq LLM rotation.
     """
@@ -283,10 +335,15 @@ async def run_google_adk_agent(query_text: str, top_k: int = 5) -> dict:
             "execution_time_ms": execution_time_ms
         }
 
-    # 1. Execute Tool 1: PostgreSQL + Memgraph Search
-    stages.append("Searching Memgraph graph...")
+    # 1. Execute Tool 1: PostgreSQL + Memgraph Search (with sensitivity filtering)
+    stages.append(f"Searching Memgraph graph (Clearance: {user_clearance})...")
     stages.append("Searching PostgreSQL vector embeddings...")
-    tool1_res = await tool_search_pgvector_and_memgraph(query_text, top_k=top_k)
+    tool1_res = await tool_search_pgvector_and_memgraph(
+        query_text,
+        top_k=top_k,
+        user_clearance=user_clearance,
+        user_department=user_department
+    )
 
     is_meeting = is_meeting_query(query_text)
 

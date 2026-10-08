@@ -1,0 +1,11 @@
+# Marine Robotics and Acoustic Mesh Networks
+Run ID: 5960A9
+
+## Abstract
+Autonomous underwater gliders for detecting thermal anomalies in the Pacific Ocean.
+Sponsored by National Science Foundation (NSF) under Award NSF-OCE-2026.
+
+Principal Investigator: Dr. Alexander Ward
+Co-Principal Investigators: Dr. Maya Patel
+Department: Marine & Coastal Sciences
+Award Amount: $920,000.00
