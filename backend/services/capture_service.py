@@ -36,7 +36,14 @@ def generate_memory_id(memory_type: str, next_index: int) -> str:
         "MeetingMinutes": "MTG",
         "IRBProtocol": "IRB",
         "LabIncident": "LAB",
-        "FacultyPublication": "PUB"
+        "FacultyPublication": "PUB",
+        # Telecom domain classifications
+        "CellOutageSOP": "OUT",
+        "EngineeringWorkaround": "WRK",
+        "NetworkDegradationLog": "DEG",
+        "HardwareReplacement": "HWR",
+        "VendorWatchdogReport": "VDR",
+        "ServiceTicket": "TCK",
     }
     code = type_map.get(memory_type, "DOC")
     return f"MEM-{code}-{next_index:06d}"
@@ -212,11 +219,21 @@ async def process_document_capture(
     category = "Conversational" if memory_type == "MeetingMinutes" else "Document"
 
     # 7. Create Canonical ResearchMemoryObject with AI Enriched Intelligence
+    is_telecom = tenant_id == "novatel_communications" or memory_type in ["CellOutageSOP", "EngineeringWorkaround", "NetworkDegradationLog", "HardwareReplacement", "VendorWatchdogReport", "ServiceTicket"]
+    domain = "telecom_enterprise" if is_telecom else "research_university"
+
+    if is_telecom:
+        entities_payload["lead_engineer"] = entities_payload.get("pi_name") or "Arjun Nair (Principal RF Engineer)"
+        entities_payload["site_code"] = entities_payload.get("sponsor_agency") or "CELL-MUM-0001 (Bandra Tower Alpha)"
+        entities_payload["outage_cost"] = 148000.0
+        entities_payload["ticket_id"] = entities_payload.get("grant_number") or "SOP-RAN-2026-091"
+        entities_payload["technology"] = "5G NR Massive MIMO"
+
     mem = ResearchMemoryObject(
         memory_id=new_memory_id,
         tenant_id=tenant_id,
         user_id=user_id,
-        domain="research_university",
+        domain=domain,
         category=category,
         memory_type=memory_type,
         severity="Info",

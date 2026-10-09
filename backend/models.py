@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 from datetime import UTC, datetime
-from sqlalchemy import DateTime, ForeignKey, String, Integer, Text
+from sqlalchemy import DateTime, ForeignKey, String, Integer, Text, Float, Boolean
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from database import Base
 from config import settings
@@ -36,6 +36,16 @@ class User(Base):
     department: Mapped[str] = mapped_column(String(100), default="Research Division", nullable=False)
     clearance_level: Mapped[str] = mapped_column(String(50), default="HighlyConfidential", nullable=False)
     tenant_id: Mapped[str] = mapped_column(String(50), default="utc_campus", nullable=False)
+
+    # Enterprise Employee Profile & Hierarchy (Session 10)
+    first_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    last_name: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    employee_number: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    job_title: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    manager_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    hire_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_temporary_password: Mapped[bool] = mapped_column(default=False, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), default="Active", nullable=False)
 
     
 
@@ -132,6 +142,319 @@ class AuditLog(Base):
 
     def get_details(self) -> dict:
         return json.loads(self.details_json) if self.details_json else {}
+
+
+class CompanyTenant(Base):
+    """
+    Multi-Tenant Organization Model (Session 10).
+    Represents an enterprise customer (e.g., Telecom Operator, Tech Enterprise).
+    """
+    __tablename__ = "company_tenants"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), unique=True, index=True, nullable=False)
+    company_name: Mapped[str] = mapped_column(String(150), nullable=False)
+    industry: Mapped[str] = mapped_column(String(50), default="Telecom", nullable=False)
+    plan_tier: Mapped[str] = mapped_column(String(50), default="Enterprise", nullable=False)
+    admin_email: Mapped[str] = mapped_column(String(120), nullable=False)
+    settings_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC)
+    )
+
+    def set_settings(self, settings: dict):
+        self.settings_json = json.dumps(settings)
+
+    def get_settings(self) -> dict:
+        return json.loads(self.settings_json) if self.settings_json else {}
+
+
+class Department(Base):
+    """
+    Enterprise Department Entity (Session 10).
+    e.g., Network Operations, Customer Support, RF Engineering, Billing & Finance
+    """
+    __tablename__ = "departments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    code: Mapped[str] = mapped_column(String(50), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC)
+    )
+
+
+class CustomRole(Base):
+    """
+    Enterprise Custom Role & Access Rules (Session 10).
+    Allows company admins to define roles and fine-grained permissions.
+    """
+    __tablename__ = "custom_roles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    role_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    clearance_level: Mapped[str] = mapped_column(String(50), default="Internal", nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    can_manage_employees: Mapped[bool] = mapped_column(default=False, nullable=False)
+    can_manage_connectors: Mapped[bool] = mapped_column(default=False, nullable=False)
+    can_curate: Mapped[bool] = mapped_column(default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC)
+    )
+
+
+class ConnectorConfig(Base):
+    """
+    Enterprise Data Source Connector Configuration (Session 11).
+    Stores endpoints, tokens, schemas, and sync statuses for Databricks, CRM, HRMS, etc.
+    """
+    __tablename__ = "connector_configs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    connector_type: Mapped[str] = mapped_column(String(50), default="DATABRICKS", nullable=False)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    server_hostname: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    http_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    access_token_masked: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    access_token_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    catalog: Mapped[str] = mapped_column(String(100), default="telco_lakehouse", nullable=False)
+    target_schemas: Mapped[str] = mapped_column(String(200), default="silver,gold", nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="DISCONNECTED", nullable=False)
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    records_synced: Mapped[int] = mapped_column(default=0, nullable=False)
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC)
+    )
+
+    def set_metadata(self, data: dict):
+        self.metadata_json = json.dumps(data)
+
+    def get_metadata(self) -> dict:
+        return json.loads(self.metadata_json) if self.metadata_json else {}
+
+
+class EmployeeDailyLog(Base):
+    """
+    Employee Daily Operational & Intuition Log (Session 12).
+    Captures daily engineering decisions, rejected trade-offs, incident root causes,
+    and tacit intuition to eliminate organizational amnesia and enrich institutional memory.
+    """
+    __tablename__ = "employee_daily_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+
+    # Core Log Metadata
+    log_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    decision_summary: Mapped[str] = mapped_column(Text, nullable=False)
+    trade_offs_considered: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Operational Reference
+    incident_or_ticket_ref: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    impacted_system_or_cell: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+    intuition_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Classification & Categorization
+    decision_category: Mapped[str] = mapped_column(String(50), default="Workaround", nullable=False)
+    urgency_level: Mapped[str] = mapped_column(String(50), default="Medium", nullable=False)
+
+    # AI Enrichment & Structured Knowledge
+    impacted_kpis_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_enrichment_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    canonical_memory_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC),
+        onupdate=lambda: datetime.now(UTC)
+    )
+
+    # Relationship to author
+    user: Mapped[User] = relationship(foreign_keys=[user_id])
+
+    def set_impacted_kpis(self, kpis: list[str]):
+        self.impacted_kpis_json = json.dumps(kpis)
+
+    def get_impacted_kpis(self) -> list[str]:
+        return json.loads(self.impacted_kpis_json) if self.impacted_kpis_json else []
+
+    def set_ai_enrichment(self, data: dict):
+        self.ai_enrichment_json = json.dumps(data)
+
+    def get_ai_enrichment(self) -> dict:
+        return json.loads(self.ai_enrichment_json) if self.ai_enrichment_json else {}
+
+
+class KnowledgeTransferSession(Base):
+    """
+    Enterprise Knowledge Transfer & Succession Session (Session 13).
+    Pairs a transitioning predecessor with a successor and tracks coverage of
+    operational decisions, critical incidents, and tacit workarounds.
+    """
+    __tablename__ = "knowledge_transfer_sessions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    predecessor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    successor_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    manager_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+
+    status: Mapped[str] = mapped_column(String(50), default="IN_PROGRESS", nullable=False)
+    scope_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    systems_in_scope_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    progress_percent: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC)
+    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    # Relationships
+    predecessor: Mapped[User] = relationship(foreign_keys=[predecessor_id])
+    successor: Mapped[User] = relationship(foreign_keys=[successor_id])
+    manager: Mapped[User] = relationship(foreign_keys=[manager_id])
+    checklist_items: Mapped[list[KTChecklistItem]] = relationship(
+        back_populates="kt_session",
+        cascade="all, delete-orphan",
+        order_by="KTChecklistItem.id"
+    )
+
+    def set_systems_in_scope(self, systems: list[str]):
+        self.systems_in_scope_json = json.dumps(systems)
+
+    def get_systems_in_scope(self) -> list[str]:
+        return json.loads(self.systems_in_scope_json) if self.systems_in_scope_json else []
+
+
+class KTChecklistItem(Base):
+    """
+    Checklist Item for Knowledge Transfer Review (Session 13).
+    Links directly to a specific decision (DEC-XXXXXX), outage event, or ticket.
+    """
+    __tablename__ = "kt_checklist_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("knowledge_transfer_sessions.id"), index=True, nullable=False)
+    tenant_id: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+
+    item_type: Mapped[str] = mapped_column(String(50), default="DECISION_REVIEW", nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reference_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
+
+    is_reviewed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC)
+    )
+
+    # Relationships
+    kt_session: Mapped[KnowledgeTransferSession] = relationship(back_populates="checklist_items")
+
+
+class SimulationRecord(Base):
+    """
+    Enterprise What-If Decision Simulation Record (Session 14).
+    Stores simulated scenarios, projected SLA penalties, churn probabilities,
+    and mitigation recommendations.
+    """
+    __tablename__ = "simulation_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+
+    scenario_type: Mapped[str] = mapped_column(String(50), index=True, nullable=False)
+    # Types: "EMPLOYEE_DEPARTURE", "PLANNED_OUTAGE", "HARDWARE_UPGRADE"
+    scenario_name: Mapped[str] = mapped_column(String(255), nullable=False)
+
+    input_params_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    results_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(UTC)
+    )
+
+    user: Mapped[User] = relationship(foreign_keys=[user_id])
+
+    def set_inputs(self, data: dict):
+        self.input_params_json = json.dumps(data)
+
+    def get_inputs(self) -> dict:
+        return json.loads(self.input_params_json) if self.input_params_json else {}
+
+    def set_results(self, data: dict):
+        self.results_json = json.dumps(data)
+
+    def get_results(self) -> dict:
+        return json.loads(self.results_json) if self.results_json else {}
+
+
+class CredentialVaultItem(Base):
+    """
+    Secure HR Credential Vault for auto-ingested or newly provisioned staff.
+    Stores initial temporary credentials for admin/HR distribution.
+    Access is strictly restricted to TenantAdmin and DeptAdmin.
+    """
+    __tablename__ = "credential_vault"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tenant_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    employee_number: Mapped[str] = mapped_column(String(30), nullable=False)
+    full_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    work_email: Mapped[str] = mapped_column(String(120), nullable=False)
+    username: Mapped[str] = mapped_column(String(60), nullable=False)
+    department: Mapped[str] = mapped_column(String(100), nullable=False)
+    role: Mapped[str] = mapped_column(String(50), nullable=False)
+    job_title: Mapped[str] = mapped_column(String(100), nullable=False)
+    clearance_level: Mapped[str] = mapped_column(String(50), nullable=False)
+    temporary_password: Mapped[str] = mapped_column(String(100), nullable=False)
+    source: Mapped[str] = mapped_column(String(50), default="Connector Ingestion", nullable=False)
+    handout_status: Mapped[str] = mapped_column(String(30), default="Pending Handout", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship(foreign_keys=[user_id])
+
 
 # Re-export institutional memory & GACM models
 from graph.models_gacm import (

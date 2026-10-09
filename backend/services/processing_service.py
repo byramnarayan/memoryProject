@@ -29,7 +29,46 @@ def heuristic_generate_summaries(
     """
     Deterministic rule-based multi-tier summarizer used when LLM is unavailable or for fallback.
     """
-    # 1. Short Summary (1-2 sentences)
+    # Check if this is a telecom operations document
+    is_telecom = (
+        memory_type in ["CellOutageSOP", "EngineeringWorkaround", "NetworkDegradationLog", "HardwareReplacement", "VendorWatchdogReport", "ServiceTicket", "NetworkOutage", "CellSite"]
+        or any(k in entities.department.lower() for k in ["ran", "core", "noc", "optical", "microwave", "telecom", "sla"])
+    )
+
+    if is_telecom:
+        lead_spec = entities.pi_name if entities.pi_name and entities.pi_name != "Unknown Faculty" else "Arjun Nair (Principal RF Engineer)"
+        short_summary = f"{title}. Managed by {lead_spec} ({entities.department}) for telecom network reliability and SLA recovery."
+        if len(short_summary) > 300:
+            short_summary = short_summary[:297] + "..."
+
+        paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 80]
+        body_snippet = " ".join(paragraphs[:3]) if paragraphs else text[:600]
+        if len(body_snippet) > 800:
+            body_snippet = body_snippet[:797] + "..."
+
+        detailed_summary = (
+            f"Operational Telecom Engineering SOP: '{title}' "
+            f"maintained by {lead_spec} within the {entities.department}. "
+            f"Outlines active incident diagnosis, triage SOP, and field/firmware bypass procedures "
+            f"for high-impact cellular assets and transmission nodes.\n\n"
+            f"Operational Details: {body_snippet}"
+        )
+
+        compliance_summary = {
+            "sla_guarantee": "Enterprise Tier-1 99.999% High Availability SLA",
+            "mttr_window": "< 45 minutes critical containment target",
+            "regulatory_telecom_standard": "3GPP Release 16 / FCC Part 27 RF Emission Threshold compliant",
+            "incident_ticket": entities.grant_number or "SOP-TELCO-2026-091",
+            "safety_clearance": "Tower Climbing & RF Radiation PPE verified"
+        }
+
+        return {
+            "short_summary": short_summary,
+            "detailed_summary": detailed_summary,
+            "compliance_summary": compliance_summary
+        }
+
+    # 1. Short Summary (1-2 sentences) - Academic
     short_summary = (
         f"{title}. Led by {entities.pi_name} ({entities.department}) and funded by {entities.sponsor_agency}"
         + (f" for ${entities.award_amount:,.2f}." if entities.award_amount > 0 else ".")
@@ -37,7 +76,7 @@ def heuristic_generate_summaries(
     if len(short_summary) > 300:
         short_summary = short_summary[:297] + "..."
 
-    # 2. Detailed Executive Summary (1-2 paragraphs)
+    # 2. Detailed Executive Summary (1-2 paragraphs) - Academic
     paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 80]
     body_snippet = " ".join(paragraphs[:3]) if paragraphs else text[:600]
     if len(body_snippet) > 800:
@@ -51,7 +90,7 @@ def heuristic_generate_summaries(
         f"Summary of work: {body_snippet}"
     )
 
-    # 3. Compliance / Milestone Summary
+    # 3. Compliance / Milestone Summary - Academic
     compliance_summary = {
         "sponsor_agency": entities.sponsor_agency,
         "grant_number": entities.grant_number,

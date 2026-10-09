@@ -33,7 +33,7 @@ from fastapi.templating import Jinja2Templates
 
 
 from database import engine, Base, AsyncSessionLocal
-from routers import users, gacm, capture, memory, governance, insights
+from routers import users, gacm, capture, memory, governance, insights, tenant, employees, connectors, employee_logs, kt_handoff, telecom_analytics
 from sqlalchemy import text, select
 from models import User
 from pwdlib import PasswordHash
@@ -74,11 +74,34 @@ async def lifespan(_app: FastAPI):
                         image_file=None
                     )
                     session.add(new_user)
-                    await session.commit()
+                # 4. Enterprise employee profile schema migrations (Session 10)
+                alter_queries = [
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS first_name VARCHAR(60);",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS last_name VARCHAR(60);",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS employee_number VARCHAR(20);",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS job_title VARCHAR(80);",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS manager_id INTEGER REFERENCES users(id);",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS hire_date TIMESTAMPTZ;",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_temporary_password BOOLEAN DEFAULT FALSE;",
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(20) DEFAULT 'Active';",
+                ]
+                for q in alter_queries:
+                    try:
+                        await session.execute(text(q))
+                    except Exception:
+                        pass
+                await session.commit()
             except Exception as inner_e:
                 logger.warning(f"Database user init note: {inner_e}")
     except Exception as e:
         logger.warning(f"PostgreSQL connection note during startup: {e}")
+
+    # 5. Initialize Neo4j multi-tenant schema indexes (Session 16)
+    try:
+        from services.graph_sync_service import ensure_graph_indexes
+        ensure_graph_indexes()
+    except Exception as ge:
+        logger.info(f"Graph index verification note: {ge}")
 
     yield
     await engine.dispose()
@@ -104,6 +127,13 @@ app.include_router(capture.router, prefix="/api/capture", tags=["capture"])
 app.include_router(memory.router, prefix="/api/memory", tags=["memory"])
 app.include_router(governance.router, prefix="/api/governance", tags=["governance"])
 app.include_router(insights.router, prefix="/api/insights", tags=["insights"])
+app.include_router(tenant.router, prefix="/api/tenant", tags=["tenant"])
+app.include_router(tenant.router, prefix="/api/tenants", tags=["tenants"])
+app.include_router(employees.router, prefix="/api/employees", tags=["employees"])
+app.include_router(connectors.router, prefix="/api/connectors", tags=["connectors"])
+app.include_router(employee_logs.router, prefix="/api/logs", tags=["logs"])
+app.include_router(kt_handoff.router, prefix="/api/kt", tags=["kt"])
+app.include_router(telecom_analytics.router, prefix="/api/enterprise-analytics", tags=["enterprise-analytics"])
 
 from graph.models_gacm import DocumentEmbedding, ResearchMemoryObject
 from sqlalchemy import func

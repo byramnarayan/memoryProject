@@ -1,19 +1,20 @@
-# Institutional Memory as a Service (MaaS) — Setup & Execution Guide
-## Tier-1 Research University Knowledge Intelligence & Curation Platform
+# MnemoGraph: Enterprise Knowledge Brain — Setup & Execution Guide
+## Multi-Domain Multi-Tenant Knowledge Intelligence Platform (Academic Research & Telecom Operations)
 
-This guide contains the complete installation, environment configuration, database setup, and execution manual for the University Institutional Memory as a Service (MaaS) platform.
+This manual contains complete installation, environment configuration, database initialization, credential management, and execution instructions for the **MnemoGraph** multi-tenant platform.
 
 ---
 
 ## 🏛️ System Overview
 
-The platform transforms unstructured university research documents (PDF grant awards, DOCX proposals, IRB protocols, research meeting minutes) into a governed, queryable **Canonical Research Memory Object** store with:
+MnemoGraph operates as a unified, domain-adaptive **Graph-Augmented Continuous Memory (GACM)** platform serving two enterprise domains with strict property-level multi-tenant isolation (`tenant_id: $tenant_id`):
 
-- **PostgreSQL (Neon Cloud)**: 29-column canonical schema holding 17,990+ synchronized institutional memory records, full-text embeddings, and immutable audit logs.
-- **Neo4j Aura Cloud**: Property graph modeling academic entity relationships: `(:Faculty)-[:LEADS]->(:Project)-[:AFFILIATED_WITH]->(:Department)` and `(:Project)-[:FUNDED_BY]->(:SponsorAgency)`.
-- **Groq Cloud AI Engine**: Llama-3-powered University NER, quality confidence scoring (0–100), and 3-tier summarization with triple-key rotation.
-- **Enterprise Governance (RBAC & ACLs)**: 5-level sensitivity clearance ladder (`Public`, `Internal`, `Restricted`, `Confidential`, `HighlyConfidential`), department-scoped curation, and CAP-7001 Legal Hold tamper blocker.
-- **Research Analytics & ReportLab Dossier Export**: Portfolio capital analytics ($2.4B+), Single-Point-of-Failure (SPOF) risk matrix, and downloadable official CSV & PDF research dossiers.
+1. **Academic Institutional Research (`utc_campus`)**:
+   - Manages **21,010 nodes & 31,527 relationships** in Neo4j Aura (`:Faculty`, `:Project`, `:Department`, `:Meeting`, `:Sponsor`).
+   - Governs $2.42B in research capital awards, faculty grant continuity, single-PI SPOF risks, and IRB compliance protocols.
+2. **Telecommunications Enterprise Operations (`novatel_communications`)**:
+   - Manages live operational graphs (`:Employee`, `:Department`, `:NetworkSite`, `:NetworkEvent`, `:ServiceTicket`).
+   - Correlates Databricks Lakehouse microwave outages against CRM trouble tickets, identifies high-risk cell tower churn hotspots, detects tribal engineering knowledge concentration (>70% SPOF), and powers interactive What-If operational simulations.
 
 ---
 
@@ -25,12 +26,14 @@ The platform transforms unstructured university research documents (PDF grant aw
    pip install uv
    ```
 3. **Node.js v18.0+** & `npm` ([nodejs.org](https://nodejs.org/))
+4. **Neo4j Aura Cloud** instance with Bolt protocol credentials (`neo4j+s://`)
+5. **PostgreSQL Database** (Neon Cloud or local instance with SSL support)
 
 ---
 
 ## 🌐 1. Environment Variables Configuration (`backend/.env`)
 
-Ensure `backend/.env` is configured with valid cloud connection strings:
+Ensure `backend/.env` is configured with valid credentials:
 
 ```env
 # Neon Cloud PostgreSQL (Async Psycopg Driver)
@@ -45,7 +48,7 @@ NEO4J_PASSWORD=YOUR_NEOAURA_PASSWORD
 QDRANT_URL=https://c7595ec1-f7ae-4509-bc60-0f34b50a2e16.ca-central-1-0.aws.cloud.qdrant.io
 QDRANT_API_KEY=YOUR_QDRANT_KEY
 
-# Groq Cloud API Keys (Automatic Round-Robin Rotation)
+# Groq Cloud API Keys (Triple-Key Round-Robin Rotation)
 GROQ_API_KEY_1=gsk_YOUR_KEY_1
 GROQ_API_KEY_2=gsk_YOUR_KEY_2
 GROQ_API_KEY_3=gsk_YOUR_KEY_3
@@ -61,33 +64,47 @@ ALGORITHM=HS256
 
 ---
 
-## 🚀 2. Database Initialization & Role Seeding
+## 🚀 2. Database Initialization, Schema & Persona Seeding
 
-Run the seed script to create required tables and populate the 4 institutional demo personas:
+Initialize the database schema, apply table migrations, and seed credentials for both academic and enterprise domains:
 
 ```powershell
 cd backend
 uv sync
+
+# 1. Seed Academic Personas & Governance Columns (utc_campus)
 uv run python data/seed_roles.py
+
+# 2. Verify Neo4j Multi-Tenant Property Indexes
+uv run python -c "from services.graph_sync_service import ensure_graph_indexes; ensure_graph_indexes()"
 ```
 
-### Institutional Demo Personas:
+### Pre-Seeded Demonstration Personas:
 
-| Persona | Email / NetID | Password | Role | Clearance Level | Department Scope |
+#### A. Academic Institutional Research (`utc_campus`):
+| Persona | Email / NetID | Password | Role | Clearance Level | Department |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Vice Chancellor / Admin** | `admin@utc.edu` | `Admin@123` | `TenantAdmin` | `HighlyConfidential` (5) | University Administration |
-| **CS Department Chair** | `chair.cs@utc.edu` | `DeptChair@123` | `DeptAdmin` | `Confidential` (4) | Computer Science & Engineering |
-| **Aerospace Researcher** | `researcher@utc.edu` | `Research@123` | `Researcher` | `Internal` (2) | Mechanical & Aerospace Engineering |
-| **Compliance Auditor** | `auditor@utc.edu` | `Audit@123` | `Auditor` | `HighlyConfidential` (5) | Research Integrity & Compliance |
+| **Vice Chancellor / Admin** | `admin@utc.edu` *(or `m@m.com`)* | `Admin@123` *(or `12345678`)* | `TenantAdmin` | `HighlyConfidential` | University Administration |
+| **CS Department Chair** | `chair.cs@utc.edu` | `DeptChair@123` | `DeptAdmin` | `Confidential` | Computer Science & Engineering |
+| **Aerospace Researcher** | `researcher@utc.edu` | `Research@123` | `Researcher` | `Internal` | Mechanical & Aerospace Engineering |
+| **Compliance Auditor** | `auditor@utc.edu` | `Audit@123` | `Auditor` | `HighlyConfidential` | Research Integrity & Compliance |
 
-*(Note: Users can also 1-click login directly from the frontend `/login` page using the interactive persona switcher!)*
+#### B. Telecom Enterprise Operations (`novatel_communications`):
+| Persona | Email | Password | Role | Clearance Level | Department |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Lead RF Engineer** | `arjun.nair@novatel_communications.com` | `Emp-6101#Pass` | `DeptAdmin` | `Confidential` | Radio Frequency Engineering |
+| **Operations Manager** | `vikram.malhotra@novatel_communications.com` | `Emp-2832!Pass` | `TenantAdmin` | `HighlyConfidential` | Core Network & Infrastructure |
+| **Support Lead** | `ananya.roy@novatel_communications.com` | `Emp-0559#Pass` | `DeptAdmin` | `Confidential` | Customer Support & SLA |
+| **Field Technician** | `rohan.sharma@novatel_communications.com` | `Emp-8173!Pass` | `Employee` | `Internal` | Field Operations & Microwave |
+
+*(Admins can also view all credential slips in the secure **Credential Vault** under `/employees`).*
 
 ---
 
-## 💻 3. Starting the Application
+## 💻 3. Starting the Services
 
 ### Start FastAPI Backend:
-> **Important Note for Windows Users:** Do not run `uvicorn.exe` directly on Windows due to OS AppLocker restrictions (error 4551). Always execute via Python module:
+> **Important Note for Windows Users:** Do not run `uvicorn.exe` directly on Windows due to OS AppLocker restrictions (error 4551). Always execute via the Python module:
 
 ```powershell
 cd backend
@@ -102,42 +119,50 @@ cd frontend
 npm install
 npm run dev
 ```
-- Frontend Application: **`http://localhost:3000`**
+- Frontend Web Application: **`http://localhost:3000`**
 
 ---
 
-## 🗺️ 4. Key Platform Features & URLs
+## 🗺️ 4. Key Application Routes & Features
 
 | Route | Feature Area | Description |
 | :--- | :--- | :--- |
-| **`/gacm`** | **Graph Explorer** | Interactive Cytoscape entity graph and hybrid Cypher + 384d vector search. |
-| **`/capture`** | **Capture Center** | Drag-and-drop ingestion of PDF/DOCX/TXT/JSON research documents with duplicate blocker. |
-| **`/review`** | **Review Queue** | Human-in-the-loop curation workspace for low-confidence grants with split-pane editor. |
-| **`/audit`** | **Audit Trail** | Immutable ISO 27001 provenance log, security denial inspector, and legal hold manager. |
-| **`/insights`** | **Research Analytics** | Portfolio capital distribution, SPOF continuity risk matrix, and CSV/PDF dossier export. |
-| **`/login`** | **SSO Gateway** | 1-Click institutional demo role switcher with real-time clearance badges. |
+| **`/gacm`** | **Mnemograph Graph Explorer** | Domain-adaptive Cytoscape entity visualizer with hybrid Cypher + 384d vector search. |
+| **`/insights`** | **Operational Intelligence & Analytics** | Domain-adaptive analytics: Telecom cell hotspots, SLA exposure, & SPOF matrix for corporate tenants; Research capital portfolio ($2.42B) for university tenants. |
+| **`/connectors`** | **Data Source Connectors Hub** | Manage external pipelines: Databricks SQL Lakehouse, upcoming PostgreSQL & CSV connectors, and live Neo4j Aura telemetry metrics. |
+| **`/employees`** | **Staff Directory & Credential Vault** | HR-gated credential distribution vault, role-based provisioning modal, and employee hierarchy map. |
+| **`/simulator`** | **What-If Decision Simulator** | Quantitative operational scenario modeler (Specialist Departure, Outage Impact, Hardware Capex). |
+| **`/kt-handoff`** | **Knowledge Transfer Engine** | Succession handoff creator for retiring/departing specialists to mitigate SPOF risks. |
+| **`/logs`** | **Daily Engineering Decision Logs** | Capture tacit field workarounds, firmware bypass notes, and system impact metadata. |
+| **`/capture`** | **Document Capture Center** | Drag-and-drop document ingestion (PDF/DOCX/TXT/JSON) with SHA-256 deduplication. |
+| **`/review`** | **Review Queue** | Human-in-the-loop curation workspace for records with AI confidence scores <85%. |
+| **`/audit`** | **Security & Governance Audit Log** | Immutable ISO 27001 provenance trail, clearance denial inspector, and legal hold manager. |
+| **`/login`** | **Authentication Gateway** | Multi-domain login with 1-click persona switcher and company onboarding link. |
 
 ---
 
 ## 🧪 5. Automated Verification Test Suites
 
-Run any of the comprehensive automated integration test suites:
+Execute test suites using `uv` to verify end-to-end functionality:
 
 ```powershell
 cd backend
 
-# Test Session 04: AI Extraction, University NER & Quality Scoring
-uv run python -u tests/test_enrichment_worker.py
+# 1. Multi-Tenant Graph Synchronization & Real-Time Hooks (Session 16)
+uv run python -u tests/test_multi_tenant_graph_sync.py
 
-# Test Session 06: Memory Review Queue & Curation Workspace
-uv run python -u tests/test_memory_review.py
+# 2. Dynamic Industry Ontology Resolver & Graph Algorithms (Session 17)
+uv run python -u tests/test_dynamic_ontology_resolver.py
 
-# Test Session 07: Sensitivity ACLs, Clearance Isolation & Audit Logs
+# 3. Automated Staff Extraction & Credential Vault Security (Session 15)
+uv run python -u tests/test_staff_auto_provision.py
+
+# 4. What-If Simulator & Cross-Silo Analytics
+uv run python -u tests/test_simulator_and_analytics.py
+
+# 5. Knowledge Transfer (KT) Succession Handoff
+uv run python -u tests/test_kt_handoff.py
+
+# 6. Sensitivity Clearance ACLs & Legal Holds
 uv run python -u tests/test_sensitivity_isolation.py
-
-# Test Session 08: Research Analytics, SPOF Matrix & PDF/CSV Dossier Exports
-uv run python -u tests/test_insights.py
-
-# Test Session 09: Full End-to-End Flow & Latency Benchmark Suite
-uv run python -u tests/test_e2e_flow.py
 ```

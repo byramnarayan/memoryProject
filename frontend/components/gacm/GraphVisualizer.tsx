@@ -22,18 +22,27 @@ export default function GraphVisualizer({
 }: GraphVisualizerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
+  const layoutRef = useRef<any>(null);
   const [selectedNode, setSelectedNode] = useState<GACMNode | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
+    // Stop any in-progress layout before mutating elements
+    if (layoutRef.current) {
+      try {
+        layoutRef.current.stop();
+      } catch (_) {}
+      layoutRef.current = null;
+    }
+
     // Transform GACM nodes and edges into Cytoscape format
     const elements: CytoscapeElement[] = [];
 
     // Nodes
     nodes.forEach((n) => {
-      let displayLabel = n.properties?.name || n.properties?.title || n.label || String(n.id);
+      let displayLabel = n.properties?.name || n.properties?.title || n.properties?.site_name || n.properties?.site_code || n.properties?.ticket_number || n.properties?.event_type || n.label || String(n.id);
       if (displayLabel.length > 25) {
         displayLabel = displayLabel.substring(0, 22) + '...';
       }
@@ -77,9 +86,7 @@ export default function GraphVisualizer({
         try {
           const layout = cy.layout({
             name: 'cose',
-            animate: true,
-            animationDuration: 500,
-            refresh: 20,
+            animate: false,
             fit: true,
             padding: 45,
             nodeRepulsion: () => 14000,
@@ -87,16 +94,16 @@ export default function GraphVisualizer({
             edgeElasticity: () => 100,
             nestingFactor: 1.2,
             gravity: 0.2,
-            numIter: 800,
-            initialTemp: 800,
+            numIter: 600,
+            initialTemp: 600,
             coolingFactor: 0.99,
             minTemp: 1.0
           } as any);
+          layoutRef.current = layout;
           layout.run();
         } catch (_) {}
       }
-      return;
-    }
+    } else {
 
     // Initialize Cytoscape with COSE physics layout to spread out nodes comfortably
     const cy = cytoscape({
@@ -124,7 +131,7 @@ export default function GraphVisualizer({
             'border-color': '#ffffff'
           }
         },
-        // Color coding per Node Entity Type (matching the UI Legend)
+        // Academic Entity Types
         {
           selector: 'node[type = "Faculty"]',
           style: {
@@ -158,6 +165,42 @@ export default function GraphVisualizer({
           style: {
             'background-color': '#7c3aed', // Purple
             'border-color': '#6d28d9'
+          }
+        },
+        // Enterprise & Telecommunications Node Styles
+        {
+          selector: 'node[type = "Employee"]',
+          style: {
+            'background-color': '#06b6d4', // Cyan
+            'border-color': '#0891b2'
+          }
+        },
+        {
+          selector: 'node[type = "NetworkSite"]',
+          style: {
+            'background-color': '#f59e0b', // Amber
+            'border-color': '#d97706'
+          }
+        },
+        {
+          selector: 'node[type = "NetworkEvent"]',
+          style: {
+            'background-color': '#f43f5e', // Rose
+            'border-color': '#e11d48'
+          }
+        },
+        {
+          selector: 'node[type = "ServiceTicket"]',
+          style: {
+            'background-color': '#0ea5e9', // Sky Blue
+            'border-color': '#0284c7'
+          }
+        },
+        {
+          selector: 'node[type = "Decision"]',
+          style: {
+            'background-color': '#d946ef', // Fuchsia
+            'border-color': '#c026d3'
           }
         },
         {
@@ -220,8 +263,13 @@ export default function GraphVisualizer({
     });
 
     cyRef.current = cy;
+    }
 
     return () => {
+      if (layoutRef.current) {
+        try { layoutRef.current.stop(); } catch (_) {}
+        layoutRef.current = null;
+      }
       if (cyRef.current && !cyRef.current.destroyed()) {
         try {
           cyRef.current.removeAllListeners();
@@ -239,6 +287,10 @@ export default function GraphVisualizer({
     cyRef.current?.center();
   };
 
+  const isEnterpriseMode = nodes.some(n => 
+    ['Employee', 'NetworkSite', 'NetworkEvent', 'ServiceTicket', 'Decision'].includes(n.type || '')
+  );
+
   return (
     <div className={`relative bg-white border border-slate-300 rounded-none shadow-sm overflow-hidden ${className}`}>
       
@@ -247,10 +299,22 @@ export default function GraphVisualizer({
         {/* Right Legend Box */}
         <div className="flex flex-wrap items-center gap-3 bg-white/95 backdrop-blur-md px-3.5 py-2 border border-slate-300 text-[11px] text-slate-800 shadow-xl">
           <span className="font-extrabold text-navy uppercase text-[10px] tracking-wider border-r border-slate-300 pr-2">Legend</span>
-          <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block border border-white"></span> Faculty / Speaker</div>
-          <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block border border-white"></span> Project / Q&A</div>
-          <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block border border-white"></span> Grant</div>
-          <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block border border-white"></span> Department</div>
+          {isEnterpriseMode ? (
+            <>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-cyan-500 inline-block border border-white"></span> Employee</div>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block border border-white"></span> Radio Site</div>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block border border-white"></span> Network Event</div>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-sky-500 inline-block border border-white"></span> Service Ticket</div>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block border border-white"></span> Department</div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block border border-white"></span> Faculty / Speaker</div>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block border border-white"></span> Project / Q&A</div>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block border border-white"></span> Grant</div>
+              <div className="flex items-center gap-1.5 font-bold"><span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block border border-white"></span> Department</div>
+            </>
+          )}
         </div>
 
         {/* Zoom Controls */}
@@ -282,7 +346,7 @@ export default function GraphVisualizer({
           <div className="flex justify-between items-start mb-2">
             <div className="flex items-center gap-1.5">
               <Info className="w-4 h-4 text-amber-600" />
-              <h4 className="font-bold text-xs text-navy">{selectedNode.properties.name || selectedNode.properties.title || selectedNode.id}</h4>
+              <h4 className="font-bold text-xs text-navy">{selectedNode.properties.name || selectedNode.properties.title || selectedNode.properties.site_name || selectedNode.properties.ticket_number || selectedNode.id}</h4>
             </div>
             <button onClick={() => setSelectedNode(null)} className="text-slate-400 hover:text-slate-800">
               <X className="w-4 h-4" />
@@ -293,16 +357,34 @@ export default function GraphVisualizer({
             {selectedNode.properties.department && (
               <p><span className="text-slate-500">Department:</span> {selectedNode.properties.department}</p>
             )}
+            {selectedNode.properties.role && (
+              <p><span className="text-slate-500">Role:</span> {selectedNode.properties.role}</p>
+            )}
+            {selectedNode.properties.employee_number && (
+              <p><span className="text-slate-500">Badge ID:</span> {selectedNode.properties.employee_number}</p>
+            )}
+            {selectedNode.properties.site_code && (
+              <p><span className="text-slate-500">Site Code:</span> {selectedNode.properties.site_code}</p>
+            )}
+            {selectedNode.properties.ticket_number && (
+              <p><span className="text-slate-500">Ticket #:</span> {selectedNode.properties.ticket_number}</p>
+            )}
+            {selectedNode.properties.severity && (
+              <p><span className="text-slate-500">Severity:</span> <span className="font-semibold text-rose-600">{selectedNode.properties.severity}</span></p>
+            )}
+            {selectedNode.properties.status && (
+              <p><span className="text-slate-500">Status:</span> {selectedNode.properties.status}</p>
+            )}
             {selectedNode.properties.institution && (
               <p><span className="text-slate-500">Institution:</span> {selectedNode.properties.institution}</p>
             )}
             {selectedNode.properties.amount && (
               <p><span className="text-slate-500">Award Amount:</span> ${Number(selectedNode.properties.amount).toLocaleString()}</p>
             )}
-            {selectedNode.properties.abstract && (
+            {(selectedNode.properties.abstract || selectedNode.properties.description) && (
               <div className="mt-2 pt-2 border-t border-slate-200">
-                <span className="text-slate-500 block mb-0.5 font-bold">Abstract / Q&A Context:</span>
-                <p className="text-slate-600 line-clamp-4 leading-tight">{selectedNode.properties.abstract}</p>
+                <span className="text-slate-500 block mb-0.5 font-bold">Context / Summary:</span>
+                <p className="text-slate-600 line-clamp-4 leading-tight">{selectedNode.properties.abstract || selectedNode.properties.description}</p>
               </div>
             )}
           </div>

@@ -20,6 +20,7 @@ from database import get_db
 
 import hashlib
 import secrets
+import string
 # setup password hasher: create password hash with aegon2 with recommed settings piwlib[argon2]
 password_hash = PasswordHash.recommended()
 
@@ -57,6 +58,13 @@ def hash_reset_token(token: str) -> str:
     so they aren't susceptible to dictionary attacks. SHA-256 is much faster and perfectly safe for this use case.
     """
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def generate_temp_password(prefix: str = "Emp") -> str:
+    """Generate a clean, readable, secure temporary password (e.g. Emp-8371!Pass)."""
+    digits = "".join(secrets.choice(string.digits) for _ in range(4))
+    special = "!@#"
+    return f"{prefix}-{digits}{secrets.choice(special)}Pass"
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:

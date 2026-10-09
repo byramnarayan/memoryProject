@@ -154,7 +154,13 @@ class ResearchMemoryObject(Base):
     def set_derived_summaries(self, data: dict):
         self.derived_summaries_json = json.dumps(data)
 
+    def set_summaries(self, data: dict):
+        self.derived_summaries_json = json.dumps(data)
+
     def get_derived_summaries(self) -> dict:
+        return json.loads(self.derived_summaries_json) if self.derived_summaries_json else {}
+
+    def get_summaries(self) -> dict:
         return json.loads(self.derived_summaries_json) if self.derived_summaries_json else {}
 
     def set_relations(self, data: list):

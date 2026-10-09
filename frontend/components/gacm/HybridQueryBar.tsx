@@ -8,6 +8,7 @@ interface HybridQueryBarProps {
   onExecuteQuery: (query: string) => Promise<void>;
   queryResult: GACMQueryResponse | null;
   isLoading: boolean;
+  placeholder?: string;
 }
 
 /**
@@ -33,7 +34,8 @@ function formatHighlightedMarkdown(text: string) {
 export default function HybridQueryBar({
   onExecuteQuery,
   queryResult,
-  isLoading
+  isLoading,
+  placeholder
 }: HybridQueryBarProps) {
   const [prompt, setPrompt] = useState('');
 
@@ -62,7 +64,7 @@ export default function HybridQueryBar({
             type="text"
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Ask GACM AI: e.g. 'Who are top experts in Oceanography and coastal systems?'..."
+            placeholder={placeholder || "Ask GACM AI: e.g. 'Who are top experts in Oceanography and coastal systems?'..."}
             className="w-full bg-transparent py-3.5 pr-4 text-slate-900 text-sm placeholder-slate-400 focus:outline-none"
           />
           <button

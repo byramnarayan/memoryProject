@@ -17,6 +17,8 @@ export interface User {
   department?: string;
   clearance_level?: "Public" | "Internal" | "Restricted" | "Confidential" | "HighlyConfidential" | string;
   tenant_id?: string;
+  first_name?: string;
+  last_name?: string;
 }
 
 export interface AuditLog {

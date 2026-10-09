@@ -29,7 +29,22 @@ COMMON_ACADEMIC_SECTIONS = [
     "IRB Protocol",
     "Human Subjects",
     "Ethics & Compliance",
-    "References"
+    "References",
+    # Telecom & Network Engineering SOP Sections
+    "Incident Summary",
+    "Root Cause Analysis",
+    "Problem Statement",
+    "Immediate Workaround",
+    "Permanent Resolution",
+    "Impact Assessment",
+    "Affected Cell Sites",
+    "Network Topology",
+    "Alarm Details",
+    "Tower Clearance",
+    "Safety Protocols",
+    "Rollback Plan",
+    "Verification Steps",
+    "Action Taken"
 ]
 
 @dataclass

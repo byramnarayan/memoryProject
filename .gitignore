@@ -13,6 +13,10 @@ venv/
 ENV/
 env/
 *.sqlite3
+*.sqlite
+*.db
+backend/knowledge_graph.db
+backend/media/uploads/
 
 # Node / Next.js
 node_modules/

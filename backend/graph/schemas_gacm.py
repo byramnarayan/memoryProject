@@ -4,6 +4,8 @@ from typing import List, Dict, Any, Optional
 class QueryRequest(BaseModel):
     query: str = Field(..., example="Which faculty members worked on AI projects related to healthcare?")
     top_k: int = Field(default=5, ge=1, le=50)
+    top_k_vector: Optional[int] = Field(default=5)
+    include_graph: Optional[bool] = Field(default=True)
 
 class GraphNode(BaseModel):
     id: str

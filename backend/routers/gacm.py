@@ -52,50 +52,73 @@ def check_out_of_topic(query_text: str) -> bool:
 @router.get("/decay-risks", response_model=list[KnowledgeDecayNode])
 async def get_knowledge_decay_risks(
     top_k: int = 10,
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     try:
-        decay_nodes = calculate_knowledge_decay_risks(user_id=DEFAULT_USER_ID, top_k=top_k)
+        tenant_id = current_user.tenant_id if current_user else "utc_campus"
+        decay_nodes = calculate_knowledge_decay_risks(tenant_id=tenant_id, top_k=top_k)
         return decay_nodes
     except Exception as e:
         logger.error(f"Error computing decay risks: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/expert-rankings")
-async def get_expert_rankings(top_k: int = 10):
+async def get_expert_rankings(
+    top_k: int = 10,
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+):
     try:
-        rankings = run_pagerank_expert_finder(user_id=DEFAULT_USER_ID, top_k=top_k)
-        return {"user_id": DEFAULT_USER_ID, "rankings": rankings}
+        tenant_id = current_user.tenant_id if current_user else "utc_campus"
+        rankings = run_pagerank_expert_finder(tenant_id=tenant_id, top_k=top_k)
+        return {"tenant_id": tenant_id, "user_id": DEFAULT_USER_ID, "rankings": rankings}
     except Exception as e:
         logger.error(f"Error computing expert rankings: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/communities")
-async def get_communities(db: AsyncSession = Depends(get_db)):
+async def get_communities(
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     try:
-        clusters = detect_research_communities(user_id=DEFAULT_USER_ID)
+        tenant_id = current_user.tenant_id if current_user else "utc_campus"
+        clusters = detect_research_communities(tenant_id=tenant_id)
         if not clusters:
-            clusters = [
-                {"cluster_department": "Physical Sciences & Radio Astronomy", "faculty_count": 42, "project_count": 180},
-                {"cluster_department": "Environmental & Marine Ecosystems", "faculty_count": 35, "project_count": 145},
-                {"cluster_department": "Scientific Information & Policy Systems", "faculty_count": 28, "project_count": 110},
-                {"cluster_department": "Agricultural Sciences & Education", "faculty_count": 50, "project_count": 210},
-                {"cluster_department": "Computer Science & Artificial Intelligence", "faculty_count": 65, "project_count": 320},
-                {"cluster_department": "Biological & Biomedical Engineering", "faculty_count": 48, "project_count": 230}
-            ]
-        return {"user_id": DEFAULT_USER_ID, "communities": clusters}
+            if tenant_id != "utc_campus":
+                clusters = [
+                    {"cluster_department": "Network Operations", "faculty_count": 5, "project_count": 14},
+                    {"cluster_department": "Radio Frequency Engineering", "faculty_count": 3, "project_count": 9},
+                    {"cluster_department": "Core EPC & 5G Infrastructure", "faculty_count": 2, "project_count": 6},
+                    {"cluster_department": "Customer Support & SLA", "faculty_count": 4, "project_count": 12},
+                ]
+            else:
+                clusters = [
+                    {"cluster_department": "Physical Sciences & Radio Astronomy", "faculty_count": 42, "project_count": 180},
+                    {"cluster_department": "Environmental & Marine Ecosystems", "faculty_count": 35, "project_count": 145},
+                    {"cluster_department": "Scientific Information & Policy Systems", "faculty_count": 28, "project_count": 110},
+                    {"cluster_department": "Agricultural Sciences & Education", "faculty_count": 50, "project_count": 210},
+                    {"cluster_department": "Computer Science & Artificial Intelligence", "faculty_count": 65, "project_count": 320},
+                    {"cluster_department": "Biological & Biomedical Engineering", "faculty_count": 48, "project_count": 230}
+                ]
+        return {"tenant_id": tenant_id, "user_id": DEFAULT_USER_ID, "communities": clusters}
     except Exception as e:
         logger.error(f"Error computing communities: {e}")
-        return {"user_id": DEFAULT_USER_ID, "communities": []}
+        return {"tenant_id": "utc_campus", "user_id": DEFAULT_USER_ID, "communities": []}
+
 
 @router.get("/history")
 @router.get("/chat-history")
-async def get_chat_history(db: AsyncSession = Depends(get_db)):
+async def get_chat_history(
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Fetches saved AI chat session history from PostgreSQL with parsed citations and graph nodes."""
     try:
+        user_id = current_user.id if current_user else DEFAULT_USER_ID
         res = await db.execute(
             select(GACMChatSession)
-            .where(GACMChatSession.user_id == DEFAULT_USER_ID)
+            .where(GACMChatSession.user_id == user_id)
             .order_by(GACMChatSession.id.desc())
             .limit(30)
         )
@@ -143,9 +166,14 @@ async def get_chat_history(db: AsyncSession = Depends(get_db)):
         return []
 
 @router.post("/chat-history")
-async def save_chat_session(payload: dict, db: AsyncSession = Depends(get_db)):
+async def save_chat_session(
+    payload: dict,
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Saves AI chat session history to PostgreSQL including full citations, graph nodes, and edges."""
     try:
+        user_id = current_user.id if current_user else DEFAULT_USER_ID
         q_text = payload.get("query_text") or payload.get("query") or ""
         ans_text = payload.get("synthesized_answer") or payload.get("answer") or ""
         cits = payload.get("citations") or payload.get("pgvector_citations") or payload.get("vector_citations") or []
@@ -154,12 +182,12 @@ async def save_chat_session(payload: dict, db: AsyncSession = Depends(get_db)):
         conf = float(payload.get("confidence_score") or 1.0)
 
         session_rec = GACMChatSession(
-            user_id=DEFAULT_USER_ID,
+            user_id=user_id,
             query_text=q_text,
             synthesized_answer=ans_text,
-            citations_json=json.dumps(cits),
-            nodes_json=json.dumps(nodes),
-            edges_json=json.dumps(edges),
+            citations_json=json.dumps(cits, default=str),
+            nodes_json=json.dumps(nodes, default=str),
+            edges_json=json.dumps(edges, default=str),
             confidence_score=conf
         )
         db.add(session_rec)
@@ -171,12 +199,17 @@ async def save_chat_session(payload: dict, db: AsyncSession = Depends(get_db)):
         return {"status": "error", "detail": str(e)}
 
 @router.delete("/chat-history/{session_id}")
-async def delete_chat_session(session_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_chat_session(
+    session_id: int,
+    current_user: Optional[models.User] = Depends(get_optional_current_user),
+    db: AsyncSession = Depends(get_db)
+):
     """Deletes a saved AI chat session from PostgreSQL."""
     try:
+        user_id = current_user.id if current_user else DEFAULT_USER_ID
         stmt = select(GACMChatSession).where(
             GACMChatSession.id == session_id,
-            GACMChatSession.user_id == DEFAULT_USER_ID
+            GACMChatSession.user_id == user_id
         )
         res = await db.execute(stmt)
         session_rec = res.scalar_one_or_none()
@@ -200,7 +233,7 @@ async def query_gacm_engine(
 ):
     """
     GOOGLE ADK TOOL-CALLING HYBRID QUERY ENGINE:
-    1. Executes Tool Calling via run_google_adk_agent with user sensitivity clearance ACLs.
+    1. Executes Tool Calling via run_google_adk_agent with dynamic ontology, tenant partitioning, and sensitivity clearance ACLs.
     2. Emits real-time execution stages.
     3. Returns source-attributed citations & out-of-scope guardrail banners.
     4. Logs search event to immutable audit_logs.
@@ -208,12 +241,29 @@ async def query_gacm_engine(
     user_query = body.query.strip()
     user_clearance = current_user.clearance_level if current_user else "Public"
     user_department = current_user.department if current_user else None
+    tenant_id = current_user.tenant_id if current_user and current_user.tenant_id else "utc_campus"
 
+    # Resolve industry dynamically from company_tenants if not academic
+    industry = "academic" if tenant_id == "utc_campus" else "telecom"
+    if tenant_id != "utc_campus":
+        try:
+            t_res = await db.execute(
+                select(models.CompanyTenant).where(models.CompanyTenant.tenant_id == tenant_id)
+            )
+            t_obj = t_res.scalar_one_or_none()
+            if t_obj and t_obj.industry:
+                industry = t_obj.industry.lower()
+        except Exception as te:
+            logger.warning(f"Could not resolve tenant industry: {te}")
+
+    effective_top_k = body.top_k or body.top_k_vector or 5
     res = await run_google_adk_agent(
         user_query,
-        top_k=body.top_k,
+        top_k=effective_top_k,
         user_clearance=user_clearance,
-        user_department=user_department
+        user_department=user_department,
+        tenant_id=tenant_id,
+        industry=industry
     )
 
     # Log search audit event
@@ -227,6 +277,8 @@ async def query_gacm_engine(
                 "query": user_query,
                 "top_k": body.top_k,
                 "clearance": user_clearance,
+                "tenant_id": tenant_id,
+                "industry": industry,
                 "results_count": len(res.get("pgvector_citations", []))
             },
             ip_address=ip
@@ -244,17 +296,18 @@ async def get_projects(
     current_user: Optional[models.User] = Depends(get_optional_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Fetches paginated institutional project records from PostgreSQL respecting user clearance ACLs."""
+    """Fetches paginated institutional project records from PostgreSQL respecting user clearance ACLs and tenant scoping."""
     try:
         from sqlalchemy import func
         user_clearance = current_user.clearance_level if current_user else "Public"
         allowed_sensitivities = get_authorized_sensitivities(user_clearance)
+        tenant_id = current_user.tenant_id if current_user and current_user.tenant_id else "utc_campus"
 
         # Check canonical ResearchMemoryObject first
         mem_count_res = await db.execute(
             select(func.count(ResearchMemoryObject.id)).where(
                 and_(
-                    ResearchMemoryObject.tenant_id == "utc_campus",
+                    ResearchMemoryObject.tenant_id == tenant_id,
                     ResearchMemoryObject.sensitivity_level.in_(allowed_sensitivities)
                 )
             )
@@ -264,13 +317,13 @@ async def get_projects(
         if mem_total > 0:
             count_stmt = select(func.count(ResearchMemoryObject.id)).where(
                 and_(
-                    ResearchMemoryObject.tenant_id == "utc_campus",
+                    ResearchMemoryObject.tenant_id == tenant_id,
                     ResearchMemoryObject.sensitivity_level.in_(allowed_sensitivities)
                 )
             )
             stmt = select(ResearchMemoryObject).where(
                 and_(
-                    ResearchMemoryObject.tenant_id == "utc_campus",
+                    ResearchMemoryObject.tenant_id == tenant_id,
                     ResearchMemoryObject.sensitivity_level.in_(allowed_sensitivities)
                 )
             )
@@ -297,11 +350,11 @@ async def get_projects(
             for m in mems:
                 entities = m.get_entities()
                 source_ref = m.get_source_ref()
-                grant_id = entities.get("grant_id") or source_ref.get("externalId") or m.memory_id
-                faculty_name = entities.get("pi_name") or "Institutional Researcher"
+                grant_id = entities.get("grant_id") or entities.get("ticket_id") or entities.get("site_id") or source_ref.get("externalId") or m.memory_id
+                faculty_name = entities.get("pi_name") or entities.get("assignee") or entities.get("engineer") or "Institutional Researcher"
                 award_amount = entities.get("award_amount") or 0.0
-                institution = entities.get("institution") or "University of Tennessee at Chattanooga"
-                start_date = entities.get("start_date")
+                institution = entities.get("institution") or entities.get("vendor") or "Enterprise Knowledge Base"
+                start_date = entities.get("start_date") or entities.get("timestamp") or (m.created_at.isoformat() if m.created_at else None)
 
                 items.append({
                     "id": m.id,
@@ -316,48 +369,51 @@ async def get_projects(
                     "category": m.category,
                     "memory_type": m.memory_type,
                     "sensitivity_level": m.sensitivity_level,
-                    "is_mised_meeting": m.memory_type == "MeetingMinutes" or "meeting" in (grant_id or "").lower()
+                    "is_mised_meeting": m.memory_type == "MeetingMinutes" or "meeting" in (str(grant_id) or "").lower()
                 })
             return {"total": total, "skip": skip, "limit": limit, "items": items}
 
-        # Fallback to DocumentEmbedding if research_memory_objects is empty
-        count_stmt = select(func.count(DocumentEmbedding.id)).where(DocumentEmbedding.user_id == DEFAULT_USER_ID)
-        stmt = select(DocumentEmbedding).where(DocumentEmbedding.user_id == DEFAULT_USER_ID)
+        # Fallback to DocumentEmbedding only for utc_campus if research_memory_objects is empty
+        if tenant_id == "utc_campus":
+            count_stmt = select(func.count(DocumentEmbedding.id)).where(DocumentEmbedding.user_id == DEFAULT_USER_ID)
+            stmt = select(DocumentEmbedding).where(DocumentEmbedding.user_id == DEFAULT_USER_ID)
 
-        if search.strip():
-            s = f"%{search.strip()}%"
-            filter_cond = or_(
-                DocumentEmbedding.project_title.ilike(s),
-                DocumentEmbedding.faculty_name.ilike(s),
-                DocumentEmbedding.institution.ilike(s),
-                DocumentEmbedding.abstract.ilike(s)
-            )
-            count_stmt = count_stmt.where(filter_cond)
-            stmt = stmt.where(filter_cond)
+            if search.strip():
+                s = f"%{search.strip()}%"
+                filter_cond = or_(
+                    DocumentEmbedding.project_title.ilike(s),
+                    DocumentEmbedding.faculty_name.ilike(s),
+                    DocumentEmbedding.institution.ilike(s),
+                    DocumentEmbedding.abstract.ilike(s)
+                )
+                count_stmt = count_stmt.where(filter_cond)
+                stmt = stmt.where(filter_cond)
 
-        total_res = await db.execute(count_stmt)
-        total = total_res.scalar() or 0
+            total_res = await db.execute(count_stmt)
+            total = total_res.scalar() or 0
 
-        stmt = stmt.order_by(DocumentEmbedding.id.asc()).offset(skip).limit(limit)
-        res = await db.execute(stmt)
-        docs = res.scalars().all()
+            stmt = stmt.order_by(DocumentEmbedding.id.asc()).offset(skip).limit(limit)
+            res = await db.execute(stmt)
+            docs = res.scalars().all()
 
-        items = [
-            {
-                "id": d.id,
-                "grant_id": d.grant_id,
-                "project_title": d.project_title,
-                "faculty_name": d.faculty_name,
-                "institution": d.institution,
-                "award_amount": d.award_amount,
-                "abstract": d.abstract,
-                "start_date": d.start_date.isoformat() if d.start_date else None,
-                "is_mised_meeting": "meeting" in (d.grant_id or "").lower() or "mised" in (d.abstract or "").lower()
-            }
-            for d in docs
-        ]
+            items = [
+                {
+                    "id": d.id,
+                    "grant_id": d.grant_id,
+                    "project_title": d.project_title,
+                    "faculty_name": d.faculty_name,
+                    "institution": d.institution,
+                    "award_amount": d.award_amount,
+                    "abstract": d.abstract,
+                    "start_date": d.start_date.isoformat() if d.start_date else None,
+                    "is_mised_meeting": "meeting" in (d.grant_id or "").lower() or "mised" in (d.abstract or "").lower()
+                }
+                for d in docs
+            ]
 
-        return {"total": total, "skip": skip, "limit": limit, "items": items}
+            return {"total": total, "skip": skip, "limit": limit, "items": items}
+
+        return {"total": 0, "skip": skip, "limit": limit, "items": []}
     except Exception as e:
         logger.error(f"Error fetching projects: {e}")
         return {"total": 0, "skip": skip, "limit": limit, "items": []}
@@ -379,10 +435,15 @@ async def get_topics(db: AsyncSession = Depends(get_db)):
         return []
 
 @router.get("/provenance-path")
-async def get_provenance_path(faculty_name: str, project_id: str):
-    """Computes shortest path between faculty and project in knowledge graph."""
+async def get_provenance_path(
+    faculty_name: str,
+    project_id: str,
+    current_user: Optional[models.User] = Depends(get_optional_current_user)
+):
+    """Computes shortest path between faculty/specialist and project/ticket in knowledge graph."""
     try:
-        res = find_shortest_provenance_path(faculty_name, project_id, user_id=DEFAULT_USER_ID)
+        tenant_id = current_user.tenant_id if current_user and current_user.tenant_id else "utc_campus"
+        res = find_shortest_provenance_path(faculty_name, project_id, tenant_id=tenant_id, user_id=DEFAULT_USER_ID)
         return res
     except Exception as e:
         logger.warning(f"Provenance path note: {e}")

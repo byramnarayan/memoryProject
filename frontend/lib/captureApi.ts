@@ -81,10 +81,19 @@ export async function uploadDocumentFile(
   // In Next.js client, hit the relative URL (proxied to FastAPI backend)
   const isServer = typeof window === 'undefined';
   const baseUrl = isServer ? (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000') : '';
+  const headers: Record<string, string> = {};
+
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
 
   const res = await fetch(`${baseUrl}/api/capture/upload`, {
     method: 'POST',
     body: formData,
+    headers,
     // Do not set Content-Type header so browser sets multipart boundary
   });
 
@@ -108,13 +117,13 @@ export async function fetchCaptureQueue(
 
   return apiFetch<CaptureQueueResponse>(`/api/capture/queue?${query.toString()}`, {
     method: 'GET',
-    skipAuth: true
+    skipAuth: false
   });
 }
 
 export async function fetchCaptureJobDetails(captureId: string): Promise<CaptureDetailResponse> {
   return apiFetch<CaptureDetailResponse>(`/api/capture/${captureId}`, {
     method: 'GET',
-    skipAuth: true
+    skipAuth: false
   });
 }

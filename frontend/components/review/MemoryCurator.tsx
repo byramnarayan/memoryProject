@@ -201,18 +201,18 @@ export const MemoryCurator: React.FC<MemoryCuratorProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-      <div className="bg-slate-900 border border-slate-700/80 w-full max-w-7xl h-[92vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden">
+      <div className="glass-panel border-cyan-500/30 w-full max-w-7xl h-[92vh] rounded-2xl flex flex-col shadow-2xl overflow-hidden shadow-cyan-950/50">
         
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 bg-[#070b14]/90 border-b border-cyan-500/15 flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="badge-cyan font-mono text-xs font-semibold">
               {memory.memory_id}
             </span>
-            <span className="text-xs px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
+            <span className="text-xs px-2.5 py-1 rounded bg-[#0c1427] text-slate-300 border border-cyan-500/20">
               {memory.memory_type}
             </span>
-            <span className="text-xs px-2.5 py-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <span className="text-xs px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
               Score: {memory.confidence_score}%
             </span>
             <span className={`text-xs px-2.5 py-1 rounded border ${
@@ -220,7 +220,7 @@ export const MemoryCurator: React.FC<MemoryCuratorProps> = ({
                 ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
                 : memory.review_status === 'rejected'
                 ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                : 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20'
             }`}>
               {memory.review_status.toUpperCase()}
             </span>
@@ -322,13 +322,13 @@ export const MemoryCurator: React.FC<MemoryCuratorProps> = ({
           {/* Right Panel: Curation & Entity Editor */}
           <div className="flex flex-col h-full overflow-hidden bg-slate-900/50">
             {/* Nav Tabs */}
-            <div className="px-6 pt-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+            <div className="px-6 pt-3 bg-[#070b14]/80 border-b border-cyan-500/15 flex items-center justify-between">
               <div className="flex space-x-4">
                 <button
                   onClick={() => setActiveTab('entities')}
                   className={`pb-2.5 text-xs font-semibold tracking-wide border-b-2 transition ${
                     activeTab === 'entities'
-                      ? 'border-amber-400 text-amber-400'
+                      ? 'border-cyan-400 text-cyan-400'
                       : 'border-transparent text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -338,7 +338,7 @@ export const MemoryCurator: React.FC<MemoryCuratorProps> = ({
                   onClick={() => setActiveTab('summaries')}
                   className={`pb-2.5 text-xs font-semibold tracking-wide border-b-2 transition ${
                     activeTab === 'summaries'
-                      ? 'border-amber-400 text-amber-400'
+                      ? 'border-cyan-400 text-cyan-400'
                       : 'border-transparent text-slate-400 hover:text-slate-200'
                   }`}
                 >
@@ -579,7 +579,7 @@ export const MemoryCurator: React.FC<MemoryCuratorProps> = ({
                 <button
                   onClick={handleApprove}
                   disabled={isApproving || isSaving}
-                  className="px-5 py-2 text-xs font-semibold text-slate-950 bg-gradient-to-r from-amber-400 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 rounded-lg shadow-lg shadow-amber-500/20 transition flex items-center gap-1.5 disabled:opacity-50"
+                  className="btn-primary-cyan text-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   <svg className="w-4 h-4 text-slate-950" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
